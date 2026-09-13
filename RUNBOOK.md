@@ -43,9 +43,87 @@ stays `data/raw_bearing` regardless of which GCS version was fetched into it; th
 version actually used is captured on every run via the `bearing_data_version` MLflow run
 tag (`pdm.training.train`'s `--tag` mechanism).
 
-**Access:** a dedicated GCP service account holds `storage.objectViewer` on
-`BEARING_DATA_BUCKET` only. Its key is stored as the repo secret `secrets.GCP_SA_KEY`
-and consumed by `google-github-actions/auth`.
+**Access:** a dedicated GCP service account (`pdm-ci-data-reader`) authenticates via
+`secrets.GCP_SA_KEY` (`google-github-actions/auth`). It originally held only
+`storage.objectViewer` on `BEARING_DATA_BUCKET` (read-only, matching its name) — that
+is **no longer sufficient**. See "MLflow tracking persistence" below: the same
+credential now also needs write access under that bucket's `mlflow/` prefix. Despite
+the name, this SA is used for both purposes today; see that section for the cleaner
+alternative (a second, write-scoped SA) that wasn't set up yet for expediency.
+
+## MLflow tracking persistence (GCS-synced sqlite)
+
+**The problem this fixes:** every workflow originally set `MLFLOW_TRACKING_URI` from
+`secrets.MLFLOW_TRACKING_URI` — a secret that was never actually created on this repo.
+`${{ secrets.MLFLOW_TRACKING_URI }}` on a nonexistent secret resolves to an **empty
+string**, not "unset". MLflow treats an empty-string tracking URI as "use the local
+`./mlruns` default" and raises nothing — so every CI job was silently writing its
+training/scoring/promotion data to a directory inside its own ephemeral runner,
+destroyed the instant the job finished. Worse than just "unrecoverable": every *job*
+(not just every workflow run) gets its own fresh runner, so even `build-and-push-dev
+.yaml`'s own `train` and `link-image-tag` jobs couldn't see each other's MLflow state.
+The whole registry-tag-based promotion/rollback design requires one durable, shared
+store - there wasn't one. Caught by actually triggering the workflow and reading real
+logs, not by review.
+
+**The fix:** `scripts/mlflow_gcs_sync.py` pulls the shared `mlflow.db` (sqlite) from
+`gs://<BEARING_DATA_BUCKET>/mlflow/mlflow.db` at the start of every job that touches
+MLflow, and pushes it back at the end. `MLFLOW_TRACKING_URI` is set directly to that
+pulled file's local path (`sqlite:///$GITHUB_WORKSPACE/mlflow.db`) for the actual
+business-logic step - never sourced from a secret in these 4 workflows, so the
+empty-secret failure mode is structurally eliminated here, not just documented as a
+risk. `src/pdm/common/config.py::configure_mlflow_env()` also now raises immediately if
+`MLFLOW_TRACKING_URI` is ever present-but-empty, as defense-in-depth against this
+recurring under a different secret name somewhere else later.
+
+Model artifacts (not just metrics/params) are handled too: a bare sqlite-backed MLflow
+client does **not** honor any environment variable for a default artifact root (verified
+empirically - `MLFLOW_DEFAULT_ARTIFACT_ROOT` is a `mlflow server`-only flag with zero
+effect on a direct client connection). `src/pdm/common/config.py::
+set_experiment_with_artifact_root()` works around this by explicitly passing
+`artifact_location=gs://<BEARING_DATA_BUCKET>/mlflow/mlartifacts/<experiment-name>`
+when an experiment is created for the first time (only ever matters once per experiment
+name - existing experiments keep whatever root they were first created with), so model
+files land natively in GCS and never need separate syncing.
+
+**Concurrency guards** (a basic guard was explicitly requested, not just documentation
+of the risk): `mlflow_gcs_sync.py pull` acquires a lock object
+(`mlflow/mlflow.db.lock`) before downloading - a second job trying to pull while a
+fresh lock is held fails immediately with a clear error rather than racing. A lock
+older than 30 minutes is assumed abandoned (a crashed job that never reached `push`)
+and is taken over, loudly. `push` records the object generation `mlflow.db` had at
+pull time and uploads with a GCS generation-match precondition - if another job pushed
+in between, the precondition fails, the push is refused (never silently overwrites),
+and the job exits non-zero with that job's writes explicitly called out as lost
+(re-running pulls the newer state first). Tested against an in-memory fake GCS backend
+implementing real precondition semantics (`tests/unit/test_mlflow_gcs_sync.py`), not
+just reasoned about.
+
+**Known limitation:** locking is a single global lock over the whole `mlflow.db`, not
+per-experiment or per-run - two unrelated MLflow-touching jobs running at the same time
+serialize against each other even if they'd never actually conflict. Acceptable for
+this pipeline's actual usage pattern (occasional pushes to main, occasional manual
+promotions), not necessarily if usage grows to frequent concurrent runs.
+
+**Required IAM change:** the existing `pdm-ci-data-reader` service account's
+`storage.objectViewer` role is **read-only** and does not permit the `push` half of
+this sync (creating/overwriting `mlflow/mlflow.db` and `mlflow/mlflow.db.lock`, or
+writing artifacts under `mlflow/mlartifacts/`). Before any of the 4 workflows can
+complete successfully, grant that SA write access - either:
+  - `roles/storage.objectAdmin` on the whole bucket (simplest, broadest), or
+  - a custom role scoped to just the `mlflow/*` prefix via an IAM Condition (more
+    least-privilege, more setup), or
+  - a **second**, purpose-specific service account/key (`GCP_MLFLOW_SA_KEY`) used only
+    by the "Authenticate to GCP" steps that precede an MLflow pull/push, keeping
+    `pdm-ci-data-reader` genuinely read-only as its name implies. Not done yet, for
+    expediency - worth doing if/when this graduates past a reference pipeline.
+
+**Graduating beyond this:** this is the pragmatic fix given what's already provisioned,
+not the final architecture. `deploy/k8s/mlflow-deployment.yaml` already exists for a
+real hosted MLflow server (the standard answer), but needs a live K8s cluster (not
+provisioned - see "known gaps (Helm/K8s layer)" below) and a concurrent-safe backend
+database (Cloud SQL/Postgres - sqlite over a network filesystem isn't safe for
+multiple concurrent writers, which is exactly the gap the lock file works around here).
 
 ## Rollback
 

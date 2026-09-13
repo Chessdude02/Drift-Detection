@@ -15,7 +15,11 @@ import sys
 import mlflow
 
 sys.path.insert(0, "src")
-from pdm.common.config import configure_mlflow_env, load_yaml  # noqa: E402
+from pdm.common.config import (  # noqa: E402
+    configure_mlflow_env,
+    load_yaml,
+    set_experiment_with_artifact_root,
+)
 from pdm.data.bearing_features import feature_columns  # noqa: E402
 from pdm.evaluation.scoring import compute_holdout_scores  # noqa: E402
 
@@ -55,7 +59,7 @@ def main() -> int:
     # A named experiment (not the implicit "Default") so
     # scripts/promote_to_production.py can reliably search for this candidate's latest
     # staging evaluation by tag.
-    mlflow.set_experiment(eval_cfg["holdout"]["staging_eval_mlflow_experiment"])
+    set_experiment_with_artifact_root(eval_cfg["holdout"]["staging_eval_mlflow_experiment"])
     with mlflow.start_run(run_name=f"staging_eval_{args.candidate_run_id[:8]}") as run:
         mlflow.set_tag("evaluation_stage", "staging")
         mlflow.set_tag("candidate_run_id", args.candidate_run_id)

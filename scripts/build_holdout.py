@@ -19,7 +19,11 @@ from pathlib import Path
 import mlflow
 
 sys.path.insert(0, "src")
-from pdm.common.config import configure_mlflow_env, load_yaml  # noqa: E402
+from pdm.common.config import (  # noqa: E402
+    configure_mlflow_env,
+    load_yaml,
+    set_experiment_with_artifact_root,
+)
 from pdm.evaluation.holdout import build_holdout_dataframe  # noqa: E402
 
 
@@ -63,7 +67,7 @@ def main() -> int:
     df.to_csv(out_path, index=False)
     print(f"Wrote {len(df)} holdout rows to {out_path}")
 
-    mlflow.set_experiment(eval_cfg["holdout"]["mlflow_experiment"])
+    set_experiment_with_artifact_root(eval_cfg["holdout"]["mlflow_experiment"])
     with mlflow.start_run(run_name=f"build_holdout_{args.version}") as run:
         mlflow.log_param("holdout_version", args.version)
         mlflow.log_param("raw_dir", str(args.raw_dir))

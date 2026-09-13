@@ -17,7 +17,7 @@ from pathlib import Path
 
 import mlflow
 
-from pdm.common.config import configure_mlflow_env, load_yaml
+from pdm.common.config import configure_mlflow_env, load_yaml, set_experiment_with_artifact_root
 from pdm.common.logging import setup_logging
 from pdm.data.datasets import get_adapter
 from pdm.training.evaluate import passes_validation_gate, rmse
@@ -64,7 +64,7 @@ def run_training(
     X_train, y_train = train_df[cols], train_df["rul"]
     X_val, y_val = val_df[cols], val_df["rul"]
 
-    mlflow.set_experiment(mlflow_cfg["experiment_name"])
+    set_experiment_with_artifact_root(mlflow_cfg["experiment_name"])
     with mlflow.start_run() as run:
         if extra_tags:
             mlflow.set_tags(extra_tags)

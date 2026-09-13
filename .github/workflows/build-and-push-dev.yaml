@@ -23,6 +23,14 @@ name: Build and Push to Dev
 # fails this workflow loudly rather than silently training on
 # tests/fixtures/ims_bearing_sample (that fixture is for pr-checks.yaml's fast, offline
 # unit/integration tests only — see tests/integration/test_train_bearing.py).
+#
+# MLflow state (mlflow.db) is NOT a secret-provided tracking server — every job that
+# touches MLflow pulls the shared sqlite file from gs://<BEARING_DATA_BUCKET>/mlflow/
+# and pushes it back when done (scripts/mlflow_gcs_sync.py), because "train" and
+# "link-image-tag" run on completely separate, ephemeral runners with no shared
+# filesystem. MLFLOW_TRACKING_URI is always set directly to that pulled sqlite path in
+# this workflow, never sourced from a secret - see RUNBOOK.md's "known gaps (MLflow
+# tracking persistence)" section for why that distinction matters.
 
 on:
   push:
@@ -70,10 +78,10 @@ jobs:
           gcloud storage cp -r "gs://$BEARING_DATA_BUCKET/raw_bearing/$BEARING_DATA_VERSION/" data/raw_bearing/
           # Defensive normalization: gcloud's exact directory-copy nesting behavior for
           # a trailing-slash source isn't precisely documented (verified against
-          # Google's own docs page, which doesn't specify it either way), so handle both
-          # possible outcomes rather than assume one - flat files landing directly in
-          # data/raw_bearing/, or nested one level under data/raw_bearing/$BEARING_DATA_VERSION/.
-          # training_bearing.yaml's raw_dir requires the flat layout either way.
+          # Google's own docs page, which doesn't specify it either way) - and verified
+          # in practice to actually nest (see RUNBOOK.md), so handle both possible
+          # outcomes rather than assume one. training_bearing.yaml's raw_dir requires
+          # the flat layout either way.
           if [ -d "data/raw_bearing/$BEARING_DATA_VERSION" ]; then
             mv "data/raw_bearing/$BEARING_DATA_VERSION"/* data/raw_bearing/
             rmdir "data/raw_bearing/$BEARING_DATA_VERSION"
@@ -85,10 +93,15 @@ jobs:
             exit 1
           fi
 
+      - name: Pull MLflow state from GCS
+        id: pull_mlflow
+        run: python scripts/mlflow_gcs_sync.py pull --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db
+
       - name: Train and tag MLflow run
         id: train
         env:
-          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_URI: sqlite:///${{ github.workspace }}/mlflow.db
+          MLFLOW_DEFAULT_ARTIFACT_ROOT: gs://${{ vars.BEARING_DATA_BUCKET }}/mlflow/mlartifacts
         run: |
           python -m pdm.training.train \
             --raw-dir data/raw_bearing \
@@ -105,6 +118,10 @@ jobs:
           model_version=$(python -c "import json; print(json.load(open('train_result.json'))['model_version'])")
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
           echo "model_version=$model_version" >> "$GITHUB_OUTPUT"
+
+      - name: Push MLflow state to GCS
+        if: always() && steps.pull_mlflow.outcome == 'success'
+        run: python scripts/mlflow_gcs_sync.py push --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db
 
   build-images:
     needs: train
@@ -157,9 +174,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -e .
 
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Pull MLflow state from GCS
+        id: pull_mlflow
+        run: python scripts/mlflow_gcs_sync.py pull --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db
+
       - name: Tag candidate model version with its image_tag
         env:
-          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_URI: sqlite:///${{ github.workspace }}/mlflow.db
         run: |
           python -c "
           from pdm.common.config import configure_mlflow_env
@@ -172,3 +198,7 @@ jobs:
           set_image_tag(client, 'ims_bearing_rul', '${{ needs.train.outputs.model_version }}', '${{ github.sha }}')
           print('Tagged ims_bearing_rul v${{ needs.train.outputs.model_version }} image_tag=${{ github.sha }}')
           "
+
+      - name: Push MLflow state to GCS
+        if: always() && steps.pull_mlflow.outcome == 'success'
+        run: python scripts/mlflow_gcs_sync.py push --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db

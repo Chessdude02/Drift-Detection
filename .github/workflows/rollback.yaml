@@ -15,6 +15,10 @@ name: Rollback
 # If the restored version is ALSO found to be bad, this workflow does not chain a
 # second rollback — see RUNBOOK.md: that case is a manual, deliberate redeployment of a
 # specific known-good version, not something to script.
+#
+# MLflow state (mlflow.db) is pulled from gs://<BEARING_DATA_BUCKET>/mlflow/ before the
+# rollback step and pushed back immediately after - see build-and-push-dev.yaml's
+# header comment and RUNBOOK.md's "known gaps (MLflow tracking persistence)" section.
 
 on:
   workflow_dispatch:
@@ -47,11 +51,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -e .
 
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Pull MLflow state from GCS
+        id: pull_mlflow
+        run: python scripts/mlflow_gcs_sync.py pull --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db
+
       - name: Roll back Production in MLflow (rollback_production tag -> Production)
         id: rollback
         env:
-          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_URI: sqlite:///${{ github.workspace }}/mlflow.db
         run: python scripts/rollback_production.py --model-name "${{ inputs.model_name }}"
+
+      - name: Push MLflow state to GCS
+        if: always() && steps.pull_mlflow.outcome == 'success'
+        run: python scripts/mlflow_gcs_sync.py push --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4

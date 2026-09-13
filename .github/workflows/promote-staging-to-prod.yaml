@@ -25,6 +25,10 @@ name: Promote Staging to Production
 # GITHUB_TOKEN cannot otherwise trigger another workflow_dispatch). That step is
 # deliberately gated on `steps.gate.outcome == 'success'`: a gate REJECTION must never
 # trigger a rollback, since nothing was promoted and Production was never touched.
+#
+# MLflow state (mlflow.db) is pulled from gs://<BEARING_DATA_BUCKET>/mlflow/ before the
+# gate step and pushed back immediately after - see build-and-push-dev.yaml's header
+# comment and RUNBOOK.md's "known gaps (MLflow tracking persistence)" section.
 
 on:
   workflow_dispatch:
@@ -63,15 +67,28 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt -e .
 
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Pull MLflow state from GCS
+        id: pull_mlflow
+        run: python scripts/mlflow_gcs_sync.py pull --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db
+
       - name: Apply promotion gate
         id: gate
         env:
-          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_URI: sqlite:///${{ github.workspace }}/mlflow.db
         run: |
           python scripts/promote_to_production.py \
             --model-name "${{ inputs.model_name }}" \
             --version "${{ inputs.model_version }}" \
             ${{ inputs.confirm_bootstrap && '--confirm-bootstrap' || '' }}
+
+      - name: Push MLflow state to GCS
+        if: always() && steps.pull_mlflow.outcome == 'success'
+        run: python scripts/mlflow_gcs_sync.py push --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
