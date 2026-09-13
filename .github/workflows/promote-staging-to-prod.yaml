@@ -19,6 +19,13 @@ name: Promote Staging to Production
 # workflow, after manually reviewing the candidate's staging scores in MLflow. It has no
 # effect on any later promotion, which always goes through the automatic gate above.
 #
+# `readiness_note` (optional) tags the promoted version operational_readiness=not_ready
+# plus this text (src/pdm/evaluation/registry.py::mark_not_operationally_ready) — for
+# promoting a candidate that passes the regression gate (not worse than the previous
+# baseline) while still being known not to clear an absolute operational bar. The gate
+# has no concept of that absolute bar; leaving this blank does NOT mean the model is
+# ready, only that nobody said otherwise on this particular promotion.
+#
 # If the K8s deploy or the post-promotion health check fails AFTER a successful
 # promotion, the final step below dispatches the "Rollback" workflow itself (via the
 # GitHub API, using this workflow's own `actions: write` permission — the default
@@ -45,6 +52,10 @@ on:
         required: false
         type: boolean
         default: false
+      readiness_note:
+        description: "Optional. If set, tags the promoted version operational_readiness=not_ready with this note - use when promoting a candidate that passes the regression gate but is known NOT to meet an absolute operational bar (e.g. val_rmse > failure_horizon). Leave blank for a normal promotion."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -84,7 +95,8 @@ jobs:
           python scripts/promote_to_production.py \
             --model-name "${{ inputs.model_name }}" \
             --version "${{ inputs.model_version }}" \
-            ${{ inputs.confirm_bootstrap && '--confirm-bootstrap' || '' }}
+            ${{ inputs.confirm_bootstrap && '--confirm-bootstrap' || '' }} \
+            ${{ inputs.readiness_note != '' && format('--readiness-note "{0}"', inputs.readiness_note) || '' }}
 
       - name: Push MLflow state to GCS
         if: always() && steps.pull_mlflow.outcome == 'success'

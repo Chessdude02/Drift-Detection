@@ -28,6 +28,7 @@ from pdm.evaluation.registry import (  # noqa: E402
     get_baseline_scores,
     get_image_tag,
     get_production_version,
+    mark_not_operationally_ready,
     promote_version,
     set_image_tag,
 )
@@ -83,6 +84,18 @@ def main() -> int:
             "Required to approve the FIRST-EVER promotion of this model (no existing "
             "Production baseline to compare against). Has no effect on any later "
             "promotion, which always goes through the automatic F2/precision gate."
+        ),
+    )
+    parser.add_argument(
+        "--readiness-note",
+        default=None,
+        help=(
+            "If set, tags the promoted version operational_readiness=not_ready plus "
+            "this note. The automated gate above only checks regression vs. the "
+            "previous baseline - it has no absolute readiness bar (e.g. RMSE <= "
+            "failure_horizon), so passing it does not mean the model is operationally "
+            "ready. Use this to record that distinction on the registry entry itself "
+            "when promoting a known-weak baseline."
         ),
     )
     args = parser.parse_args()
@@ -142,6 +155,11 @@ def main() -> int:
     set_image_tag(client, args.model_name, args.version, image_tag)  # reaffirm, idempotent
 
     print(f"Promoted {args.model_name} v{args.version} to Production (image_tag={image_tag})")
+
+    if args.readiness_note:
+        mark_not_operationally_ready(client, args.model_name, args.version, args.readiness_note)
+        print(f"Tagged v{args.version} operational_readiness=not_ready: {args.readiness_note}")
+
     _write_github_output("approved", "true")
     _write_github_output("image_tag", image_tag)
     _write_github_output("promoted_version", args.version)

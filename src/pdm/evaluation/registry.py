@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 ROLLBACK_PRODUCTION_TAG = "rollback_production"
 IMAGE_TAG_KEY = "image_tag"
 BASELINE_KEYS = ("baseline_f2_score", "baseline_precision", "baseline_pr_auc")
+OPERATIONAL_READINESS_TAG = "operational_readiness"
+OPERATIONAL_READINESS_NOTE_TAG = "operational_readiness_note"
 
 
 def get_production_version(client: MlflowClient, model_name: str) -> ModelVersion | None:
@@ -111,6 +113,25 @@ def promote_version(
     # A version that's now Production can't simultaneously be the rollback target.
     client.delete_model_version_tag(model_name, version, ROLLBACK_PRODUCTION_TAG)
     logger.info("Promoted %s v%s to Production", model_name, version)
+
+
+def mark_not_operationally_ready(
+    client: MlflowClient, model_name: str, version: str, note: str
+) -> None:
+    """Tags a (typically just-promoted) Production version as NOT meeting the absolute
+    operational-readiness bar, even though it passed the automated promotion gate.
+
+    `evaluate_promotion_gate` only checks "not a regression vs. the current baseline" -
+    it has no concept of an absolute readiness threshold (e.g. RMSE <= failure_horizon).
+    That means a model can legitimately be `stage=Production` while still being known-
+    unready for confident operational use. Without a tag recorded here, that distinction
+    is invisible to anyone reading the registry later - `stage=Production` alone reads as
+    "ready". This makes it explicit on the model version itself, not just in a config
+    file's comments (see config/training_bearing.yaml's max_rmse rationale).
+    """
+    client.set_model_version_tag(model_name, version, OPERATIONAL_READINESS_TAG, "not_ready")
+    client.set_model_version_tag(model_name, version, OPERATIONAL_READINESS_NOTE_TAG, note)
+    logger.info("Tagged %s v%s operational_readiness=not_ready: %s", model_name, version, note)
 
 
 def rollback_to_previous(client: MlflowClient, model_name: str) -> ModelVersion:

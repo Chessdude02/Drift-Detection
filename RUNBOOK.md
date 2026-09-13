@@ -125,6 +125,33 @@ provisioned - see "known gaps (Helm/K8s layer)" below) and a concurrent-safe bac
 database (Cloud SQL/Postgres - sqlite over a network filesystem isn't safe for
 multiple concurrent writers, which is exactly the gap the lock file works around here).
 
+## Operational readiness vs. "Production" stage
+
+`stage=Production` in the MLflow registry means "passed the automated promotion gate" —
+i.e. not a regression vs. the previous baseline (`src/pdm/evaluation/promotion.py`). It
+does **not** mean "operationally ready" — the gate has no concept of an absolute quality
+bar (e.g. RMSE at or below `failure_horizon`), so a known-weak model can legitimately sit
+in Production.
+
+When that's the case, `scripts/promote_to_production.py --readiness-note "..."` (wired to
+`promote-staging-to-prod.yaml`'s `readiness_note` input) tags the promoted version
+`operational_readiness=not_ready` plus the note itself
+(`src/pdm/evaluation/registry.py::mark_not_operationally_ready`), directly on the model
+version — not just in a config file's comments — so anyone reading the registry later
+sees the caveat without having to separately check `config/training_bearing.yaml`. Leave
+`readiness_note` blank for a promotion that does clear that bar.
+
+**`ims_bearing_rul` v2 (promoted 2026-09-13):** tagged
+`operational_readiness=not_ready` — val_rmse 61.1 is 2.0x the 30-snapshot
+`failure_horizon`, meaning near-boundary RUL predictions carry error comparable to or
+larger than the decision window itself (holdout precision at horizon=30 is 0.52 — see
+`config/training_bearing.yaml`'s `max_rmse` comment for the full reasoning). Promoted
+anyway, deliberately, to prove the CI/CD pipeline (train → gate → registry → staging eval
+→ promotion gate → registry tag) works end-to-end for real, not as a claim that this
+specific model is fit for operational use. Closing this requires model-quality work
+(better features/model/split — see "known gaps (failure-horizon calibration)" above), not
+a config or gate change.
+
 ## Rollback
 
 The rollback workflow (`.github/workflows/rollback.yaml`) always reverts to the one
@@ -230,3 +257,18 @@ Treat the Helm/K8s layer as "internally consistent and carefully reasoned throug
 68 real passing tests exercising actual behavior; this layer does not have an equivalent
 yet. If a real kind cluster becomes available, re-running `scripts/setup_kind.ps1` plus
 an actual `helm upgrade` and traffic test against each workflow would close this gap.
+
+**Current state (2026-09-13): `secrets.KUBE_CONFIG` does not exist on the repo at all**
+(confirmed via `gh secret list`) — there is no cluster credential configured, not just an
+unverified one. `promote-dev-to-staging.yaml`, `promote-staging-to-prod.yaml`, and
+`rollback.yaml` will all fail at their "Configure kubeconfig" / deploy steps until a real
+cluster + that secret exist. Because MLflow scoring and promotion are independent of the
+K8s deploy mechanism by design (see each workflow's header comment), the steps in
+`promote-dev-to-staging.yaml` were reordered so deploy/smoke-test failures
+(`continue-on-error: true`) do not prevent holdout scoring from running and being pushed
+to GCS — the job still correctly fails overall (final step), but the MLflow-side evidence
+is captured either way. `promote-staging-to-prod.yaml`'s gate/promotion already ran before
+its K8s steps, so it did not need the same restructuring. Closing this gap for real
+requires either a real cluster + `KUBE_CONFIG`, or accepting (and explicitly deciding,
+not silently allowing) that promotions exercise only the MLflow registry state change
+until one exists.

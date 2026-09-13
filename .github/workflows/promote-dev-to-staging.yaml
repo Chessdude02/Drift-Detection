@@ -6,7 +6,11 @@ name: Promote Dev to Staging
 # artifact against the fixed holdout set (scripts/score_on_holdout.py loads the model
 # in-process via its MLflow URI — it does NOT call the staging deployment's HTTP API,
 # so the smoke test and the scoring are independent checks, not one depending on the
-# other's exact mechanism).
+# other's exact mechanism). Because they're independent, the deploy and smoke-test steps
+# use `continue-on-error: true` and scoring always runs after them regardless of their
+# outcome — a missing/unreachable cluster (see RUNBOOK.md's "known gaps (Helm/K8s
+# layer)") fails this job overall (final step below) without silently skipping the
+# scoring evidence that promote-staging-to-prod.yaml's gate depends on.
 #
 # Scores are logged to the `ims_bearing_rul_staging_eval` MLflow experiment (matches
 # config/evaluation.yaml's `holdout.staging_eval_mlflow_experiment` verbatim) tagged
@@ -117,6 +121,8 @@ jobs:
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Deploy candidate to staging
+        id: deploy
+        continue-on-error: true
         env:
           KUBECONFIG: kubeconfig.yaml
         run: |
@@ -133,6 +139,9 @@ jobs:
             --wait --timeout 5m
 
       - name: Smoke test (candidate serves and reports healthy)
+        id: smoke
+        if: steps.deploy.outcome == 'success'
+        continue-on-error: true
         env:
           KUBECONFIG: kubeconfig.yaml
         run: kubectl argo rollouts status pdm-serving -n pdm-staging --timeout 180s
@@ -148,3 +157,13 @@ jobs:
       - name: Push MLflow state to GCS
         if: always() && steps.pull_mlflow.outcome == 'success'
         run: python scripts/mlflow_gcs_sync.py push --bucket "${{ vars.BEARING_DATA_BUCKET }}" --db-path mlflow.db
+
+      - name: Fail job if staging deployment did not actually succeed
+        # Deliberately last: scoring evidence above is real and already pushed to GCS
+        # even when this fails. This step exists so a missing/unreachable cluster still
+        # fails the workflow (accurate: the candidate was never actually deployed to
+        # staging) instead of continue-on-error silently reporting green.
+        if: steps.deploy.outcome != 'success' || steps.smoke.outcome != 'success'
+        run: |
+          echo "::error::Staging deploy (outcome=${{ steps.deploy.outcome }}) or smoke test (outcome=${{ steps.smoke.outcome }}) did not succeed - see RUNBOOK.md 'known gaps (Helm/K8s layer)'. Holdout scoring above is still valid and was still recorded."
+          exit 1

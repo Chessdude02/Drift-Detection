@@ -8,6 +8,7 @@ from pdm.evaluation.registry import (
     get_image_tag,
     get_production_version,
     get_rollback_target,
+    mark_not_operationally_ready,
     promote_version,
     rollback_to_previous,
     set_image_tag,
@@ -120,3 +121,21 @@ def test_get_baseline_scores_none_when_tags_missing(client):
     v1 = _new_version(client)
     version = client.get_model_version(MODEL_NAME, v1)
     assert get_baseline_scores(version) is None
+
+
+def test_mark_not_operationally_ready_sets_tags_on_the_version(client):
+    v1 = _new_version(client)
+    promote_version(
+        client, MODEL_NAME, v1, {"f2_score": 0.4, "precision": 0.5, "pr_auc": 0.6}, "v1"
+    )
+
+    mark_not_operationally_ready(
+        client, MODEL_NAME, v1, "val_rmse (61.1) is 2.0x failure_horizon (30); precision=0.52"
+    )
+
+    refreshed = client.get_model_version(MODEL_NAME, v1)
+    assert refreshed.tags["operational_readiness"] == "not_ready"
+    assert "2.0x failure_horizon" in refreshed.tags["operational_readiness_note"]
+    # Marking readiness doesn't disturb stage or the baseline tags set at promotion.
+    assert refreshed.current_stage == "Production"
+    assert get_baseline_scores(refreshed) == {"f2_score": 0.4, "precision": 0.5, "pr_auc": 0.6}
