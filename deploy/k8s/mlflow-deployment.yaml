@@ -1,0 +1,57 @@
+# In-cluster MLflow tracking server so training Jobs and serving Pods share one
+# MLFLOW_TRACKING_URI instead of each holding a local sqlite file.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdm-mlflow
+  namespace: pdm
+  labels:
+    app: pdm-mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pdm-mlflow
+  template:
+    metadata:
+      labels:
+        app: pdm-mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: python:3.11-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install --no-cache-dir "mlflow>=2.14,<3.0" && \
+              mlflow server \
+                --host 0.0.0.0 --port 5000 \
+                --backend-store-uri sqlite:////mlflow-data/mlflow.db \
+                --default-artifact-root /mlflow-data/mlruns
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: mlflow-data
+              mountPath: /mlflow-data
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 10
+      volumes:
+        - name: mlflow-data
+          persistentVolumeClaim:
+            claimName: pdm-mlflow-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pdm-mlflow
+  namespace: pdm
+spec:
+  selector:
+    app: pdm-mlflow
+  ports:
+    - port: 5000
+      targetPort: 5000

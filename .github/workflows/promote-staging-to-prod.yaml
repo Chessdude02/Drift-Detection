@@ -1,0 +1,116 @@
+name: Promote Staging to Production
+
+# Applies the F2/precision promotion gate (thresholds live ONLY in
+# config/promotion_gate.yaml, applied by src/pdm/evaluation/promotion.py — never
+# hardcoded here) to a candidate model version that has already been evaluated on
+# staging by the dev->staging workflow.
+#
+# Approved: scripts/promote_to_production.py promotes the MLflow model version to
+# Production, freezes its baseline_f2_score/baseline_precision/baseline_pr_auc tags as
+# the new comparison baseline, reaffirms its image_tag, and this workflow then updates
+# the K8s deployment to that image and runs a post-promotion health check.
+#
+# Rejected: the gate step exits non-zero with its reasons printed in the job log: the
+# workflow fails there. No later step runs — Production's MLflow stage and K8s
+# deployment are both left completely untouched.
+#
+# Bootstrap (no existing Production baseline — this model's first-ever promotion) is
+# NEVER automatic: `confirm_bootstrap` must be explicitly set true by whoever runs this
+# workflow, after manually reviewing the candidate's staging scores in MLflow. It has no
+# effect on any later promotion, which always goes through the automatic gate above.
+#
+# If the K8s deploy or the post-promotion health check fails AFTER a successful
+# promotion, the final step below dispatches the "Rollback" workflow itself (via the
+# GitHub API, using this workflow's own `actions: write` permission — the default
+# GITHUB_TOKEN cannot otherwise trigger another workflow_dispatch). That step is
+# deliberately gated on `steps.gate.outcome == 'success'`: a gate REJECTION must never
+# trigger a rollback, since nothing was promoted and Production was never touched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_name:
+        description: "MLflow registered model name"
+        required: true
+        default: "ims_bearing_rul"
+      model_version:
+        description: "Candidate's registered model version to evaluate for promotion (must already have a staging evaluation logged — run the dev->staging workflow first)"
+        required: true
+      confirm_bootstrap:
+        description: "Set true ONLY to approve this model's first-ever promotion (no existing Production baseline to compare against). Ignored for every later promotion."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write # required to dispatch rollback.yaml from the auto-rollback step below
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      image_tag: ${{ steps.gate.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt -e .
+
+      - name: Apply promotion gate
+        id: gate
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: |
+          python scripts/promote_to_production.py \
+            --model-name "${{ inputs.model_name }}" \
+            --version "${{ inputs.model_version }}" \
+            ${{ inputs.confirm_bootstrap && '--confirm-bootstrap' || '' }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install Argo Rollouts kubectl plugin
+        run: |
+          curl -sSL -o kubectl-argo-rollouts https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/
+
+      - name: Configure kubeconfig
+        run: echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig.yaml
+
+      - name: Deploy promoted image to production (drives the Argo Rollouts canary)
+        env:
+          KUBECONFIG: kubeconfig.yaml
+        run: |
+          helm upgrade --install pdm-serving deploy/helm/pdm-serving \
+            --namespace pdm --create-namespace \
+            --reuse-values \
+            --set image.tag=${{ steps.gate.outputs.image_tag }} \
+            --wait --timeout 5m
+
+      - name: Post-promotion health check
+        run: kubectl argo rollouts status pdm-serving -n pdm --timeout 300s
+        env:
+          KUBECONFIG: kubeconfig.yaml
+
+      - name: Auto-trigger rollback on failed deploy or health check
+        # Only if the gate step itself succeeded (a promotion actually happened) AND a
+        # LATER step failed. Never fires on a gate rejection.
+        if: failure() && steps.gate.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run rollback.yaml \
+            --ref "${{ github.ref_name }}" \
+            -f model_name="${{ inputs.model_name }}" \
+            -f reason="Auto-triggered: deploy or post-promotion health check failed for ${{ inputs.model_name }} v${{ inputs.model_version }} (promote-staging-to-prod run ${{ github.run_id }})"

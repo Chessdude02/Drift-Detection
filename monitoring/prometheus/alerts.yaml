@@ -1,0 +1,61 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pdm-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: pdm.rules
+      rules:
+        - alert: DriftScoreHigh
+          expr: pdm_drift_score > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Predictive-maintenance model input drift is high ({{ $value }})"
+            description: >
+              The share of drifted feature columns reported by the drift-check CronJob has
+              exceeded 0.5 for 5 minutes. A retrain Job should already have been triggered
+              by src/pdm/drift/trigger_retrain.py — check `kubectl get jobs -n pdm`.
+
+        - alert: ServingErrorRateSpike
+          expr: |
+            sum(rate(pdm_predictions_total{status="error", shadow="false"}[5m]))
+            /
+            clamp_min(sum(rate(pdm_predictions_total{shadow="false"}[5m])), 1)
+            > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "pdm-serving error rate above 5%"
+            description: >
+              More than 5% of non-shadow prediction requests have failed over the last 5
+              minutes. If a canary rollout is in progress, Argo Rollouts' analysis should
+              already be rolling it back; otherwise consider `./scripts/rollback.ps1 undo`.
+
+        - alert: ServingHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(pdm_request_latency_seconds_bucket{shadow="false"}[5m])) by (le)
+            ) > 1.0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "pdm-serving p95 latency above 1s"
+            description: "p95 request latency has exceeded 1 second for 5 minutes."
+
+        - alert: NoModelLoaded
+          expr: absent(pdm_model_version_info)
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No pdm-serving pod has a model loaded"
+            description: >
+              pdm_model_version_info has been absent for 10 minutes, meaning /readyz is
+              false everywhere and traffic cannot be served.

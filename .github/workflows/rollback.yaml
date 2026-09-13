@@ -1,0 +1,78 @@
+name: Rollback
+
+# Reverts Production to the version tagged `rollback_production=true` — exactly one
+# step back, never a full history walk (src/pdm/evaluation/registry.py, RUNBOOK.md).
+#
+# Two triggers:
+#   1. Manual: a human runs this via workflow_dispatch.
+#   2. Automatic: promote-staging-to-prod.yaml triggers this itself (via the GitHub API,
+#      using `actions: write` on its own GITHUB_TOKEN — see that workflow's final step)
+#      ONLY when its promotion gate step succeeded (a promotion actually happened) AND a
+#      LATER step (the K8s deploy or the post-promotion health check) failed. A gate
+#      REJECTION never triggers this: nothing was promoted, so there's nothing to roll
+#      back from, and Production was already left untouched by that workflow.
+#
+# If the restored version is ALSO found to be bad, this workflow does not chain a
+# second rollback — see RUNBOOK.md: that case is a manual, deliberate redeployment of a
+# specific known-good version, not something to script.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_name:
+        description: "MLflow registered model name"
+        required: true
+        default: "ims_bearing_rul"
+      reason:
+        description: "Why this rollback is being run (free text, for the run log only)"
+        required: false
+        default: "Manually triggered"
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Log reason
+        run: |
+          echo "Rollback reason: ${{ inputs.reason }}"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -e .
+
+      - name: Roll back Production in MLflow (rollback_production tag -> Production)
+        id: rollback
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: python scripts/rollback_production.py --model-name "${{ inputs.model_name }}"
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure kubeconfig
+        run: echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig.yaml
+
+      - name: Revert K8s deployment to the restored version's image
+        env:
+          KUBECONFIG: kubeconfig.yaml
+        run: |
+          helm upgrade --install pdm-serving deploy/helm/pdm-serving \
+            --namespace pdm --create-namespace \
+            --reuse-values \
+            --set image.tag=${{ steps.rollback.outputs.image_tag }} \
+            --wait --timeout 5m
+
+      - name: Verify rollback health
+        env:
+          KUBECONFIG: kubeconfig.yaml
+        run: kubectl argo rollouts status pdm-serving -n pdm --timeout 300s

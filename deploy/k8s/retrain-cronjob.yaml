@@ -1,0 +1,33 @@
+# Scheduled full retrain (weekly) — also the template drift/trigger_retrain.py clones
+# into a one-off Job when drift crosses the configured threshold.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pdm-retrain
+  namespace: pdm
+spec:
+  schedule: "0 3 * * 0" # weekly, Sunday 03:00
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: train
+              image: ghcr.io/OWNER/pdm-train:latest
+              args: ["--raw-dir", "/data/raw", "--config-name", "training.yaml", "--fail-on-gate"]
+              env:
+                - name: MLFLOW_TRACKING_URI
+                  value: "http://pdm-mlflow.pdm.svc.cluster.local:5000"
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+              resources:
+                requests: { cpu: "500m", memory: "512Mi" }
+                limits: { cpu: "2", memory: "2Gi" }
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: pdm-mlflow-data

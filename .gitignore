@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Env
+.env
+
+# Data (fetched separately, see data/README.md)
+data/raw/*
+!data/raw/.gitkeep
+data/raw_bearing/*
+!data/raw_bearing/.gitkeep
+data/raw_bearing_holdout/*
+!data/raw_bearing_holdout/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# MLflow
+mlruns/
+mlflow.db
+mlartifacts/
+
+# Inference / drift artifacts
+inference_log.db
+reference_data.parquet
+
+# Kind / kube
+kubeconfig*.yaml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/

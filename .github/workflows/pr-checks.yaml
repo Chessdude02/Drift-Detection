@@ -1,0 +1,41 @@
+name: PR Checks
+
+# Single required check for every PR: lint/format, then the unit suite (tests/unit/ —
+# fast, isolated, no real pipeline run) and the integration suite (tests/integration/ —
+# real training-pipeline runs against committed fixtures), split via pyproject.toml's
+# `unit`/`integration` pytest markers so a failure clearly names which suite broke.
+#
+# This replaces the old ci.yaml (ran the same pytest suite, duplicating this on every
+# PR) and model-validation.yaml (referenced tests/test_model_validation.py, a path that
+# moved to tests/integration/test_model_validation_cmapss.py during a test-suite
+# restructure and was never updated — that workflow silently failed on every run).
+# Neither fires anymore; both files are deleted, not just disabled.
+
+on:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt -e .
+
+      - name: Lint (ruff)
+        run: ruff check src tests
+
+      - name: Format check (black)
+        run: black --check src tests
+
+      - name: Run unit tests
+        run: pytest -q -m unit
+
+      - name: Run integration tests
+        run: pytest -q -m integration

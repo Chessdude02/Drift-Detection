@@ -1,0 +1,8 @@
+# No special API permissions needed by the serving Pods themselves today; this
+# ServiceAccount exists so future capabilities (e.g. reading its own Rollout status)
+# have an identity to bind a Role to without touching the Rollout/Deployment spec.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pdm-serving
+  namespace: {{ .Values.namespace }}

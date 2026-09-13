@@ -1,0 +1,34 @@
+# Queries Prometheus (installed by kube-prometheus-stack) for the canary's error rate
+# and p95 latency during each analysis step; Argo Rollouts auto-promotes on success and
+# auto-rolls-back once failureLimit consecutive analysis runs fail.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: pdm-serving-analysis
+  namespace: {{ .Values.namespace }}
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: error-rate
+      interval: {{ .Values.rollout.analysis.interval }}
+      failureLimit: {{ .Values.rollout.analysis.failureLimit }}
+      provider:
+        prometheus:
+          address: {{ .Values.rollout.analysis.prometheusServer }}
+          query: |
+            sum(rate(pdm_predictions_total{status="error", shadow="false"}[2m]))
+            /
+            clamp_min(sum(rate(pdm_predictions_total{shadow="false"}[2m])), 1)
+      successCondition: result[0] <= {{ .Values.rollout.analysis.maxErrorRate }}
+    - name: p95-latency
+      interval: {{ .Values.rollout.analysis.interval }}
+      failureLimit: {{ .Values.rollout.analysis.failureLimit }}
+      provider:
+        prometheus:
+          address: {{ .Values.rollout.analysis.prometheusServer }}
+          query: |
+            histogram_quantile(0.95,
+              sum(rate(pdm_request_latency_seconds_bucket{shadow="false"}[2m])) by (le)
+            )
+      successCondition: result[0] <= {{ .Values.rollout.analysis.maxP95LatencySeconds }}

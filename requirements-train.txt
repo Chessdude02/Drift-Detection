@@ -1,0 +1,8 @@
+-r requirements.txt
+scikit-learn>=1.5,<2.0
+# Pinned <4.6: lightgbm>=4.6's pyarrow/narwhals zero-copy DataFrame fast path segfaults
+# (native access violation) with pyarrow 16.x on Windows. Revisit once resolved upstream.
+lightgbm>=4.3,<4.6
+xgboost>=2.0,<3.0
+pyarrow>=16.0,<17.0
+scipy>=1.11,<2.0

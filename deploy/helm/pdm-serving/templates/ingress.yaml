@@ -1,0 +1,30 @@
+{{- if .Values.ingress.enabled }}
+# Real traffic to pdm-serving-stable/canary (managed by Argo Rollouts' nginx traffic
+# routing above), mirrored to the shadow Service. NGINX mirroring is fire-and-forget —
+# the client only ever sees the stable/canary response; the mirrored copy's response is
+# discarded by NGINX itself, and the shadow app additionally marks/logs it (X-Shadow)
+# rather than relying solely on that. This is the documented best-effort alternative to
+# a service-mesh-grade shadow (Istio/SMI), which wasn't in scope for this deployment.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pdm-serving
+  namespace: {{ .Values.namespace }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+    nginx.ingress.kubernetes.io/mirror-target: "http://pdm-serving-shadow.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.service.port }}$request_uri"
+    nginx.ingress.kubernetes.io/mirror-request-body: "true"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pdm-serving-stable
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

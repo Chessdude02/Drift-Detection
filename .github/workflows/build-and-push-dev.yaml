@@ -1,0 +1,174 @@
+name: Build and Push to Dev
+
+# on push to main: trains the IMS Bearing model, tags the MLflow run with CI provenance,
+# builds the three Docker images (serve/train/drift) and pushes them to GHCR tagged
+# with the git SHA plus a floating `dev`/`latest` tag, then links the newly registered
+# model version to that image via its image_tag registry tag — this is the link
+# promote-dev-to-staging.yaml and promote-to-production.py read to know which image
+# goes with which model version.
+#
+# This workflow does NOT deploy anywhere. Promotion to staging/production is always a
+# separate, explicit workflow_dispatch (promote-dev-to-staging.yaml /
+# promote-staging-to-prod.yaml) — "dev" here means "freshly built, not yet promoted",
+# not a running environment.
+#
+# Supersedes the old build-and-push.yaml (built the same 3 images unconditionally, with
+# no training or registry linkage) and deploy.yaml (auto-deployed straight to production
+# on every successful build) — both deleted, not just disabled. This is now the only
+# workflow triggered by `push: branches: [main]`.
+#
+# Training data comes from GCS (gs://<BEARING_DATA_BUCKET>/raw_bearing/<version>/,
+# see RUNBOOK.md for the bucket, versioning convention, and rotation procedure) — there
+# is NO fallback to the committed test fixture here; a missing/misconfigured bucket
+# fails this workflow loudly rather than silently training on
+# tests/fixtures/ims_bearing_sample (that fixture is for pr-checks.yaml's fast, offline
+# unit/integration tests only — see tests/integration/test_train_bearing.py).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.train.outputs.run_id }}
+      model_version: ${{ steps.train.outputs.model_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-train.txt -e .
+
+      - name: Require training data bucket configured
+        run: |
+          if [ -z "${{ vars.BEARING_DATA_BUCKET }}" ]; then
+            echo "::error::vars.BEARING_DATA_BUCKET is not set. This workflow trains on the real GCS-hosted dataset only - it does not fall back to the committed test fixture. See RUNBOOK.md 'Training data' section."
+            exit 1
+          fi
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Fetch training data from GCS
+        env:
+          BEARING_DATA_BUCKET: ${{ vars.BEARING_DATA_BUCKET }}
+          BEARING_DATA_VERSION: ${{ vars.BEARING_DATA_VERSION || 'v1' }}
+        run: |
+          mkdir -p data/raw_bearing
+          gcloud storage cp -r "gs://$BEARING_DATA_BUCKET/raw_bearing/$BEARING_DATA_VERSION/" data/raw_bearing/
+          # Defensive normalization: gcloud's exact directory-copy nesting behavior for
+          # a trailing-slash source isn't precisely documented (verified against
+          # Google's own docs page, which doesn't specify it either way), so handle both
+          # possible outcomes rather than assume one - flat files landing directly in
+          # data/raw_bearing/, or nested one level under data/raw_bearing/$BEARING_DATA_VERSION/.
+          # training_bearing.yaml's raw_dir requires the flat layout either way.
+          if [ -d "data/raw_bearing/$BEARING_DATA_VERSION" ]; then
+            mv "data/raw_bearing/$BEARING_DATA_VERSION"/* data/raw_bearing/
+            rmdir "data/raw_bearing/$BEARING_DATA_VERSION"
+          fi
+          n=$(ls data/raw_bearing | wc -l)
+          echo "Fetched $n files into data/raw_bearing/"
+          if [ "$n" -eq 0 ]; then
+            echo "::error::No files landed in data/raw_bearing/ after fetch - check the bucket path and service account permissions."
+            exit 1
+          fi
+
+      - name: Train and tag MLflow run
+        id: train
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: |
+          python -m pdm.training.train \
+            --raw-dir data/raw_bearing \
+            --config-name training_bearing.yaml \
+            --fail-on-gate \
+            --tag git_sha="${{ github.sha }}" \
+            --tag git_ref="${{ github.ref_name }}" \
+            --tag ci_run_id="${{ github.run_id }}" \
+            --tag ci_actor="${{ github.actor }}" \
+            --tag bearing_data_version="${{ vars.BEARING_DATA_VERSION || 'v1' }}" \
+            --json-out train_result.json
+          cat train_result.json
+          run_id=$(python -c "import json; print(json.load(open('train_result.json'))['run_id'])")
+          model_version=$(python -c "import json; print(json.load(open('train_result.json'))['model_version'])")
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "model_version=$model_version" >> "$GITHUB_OUTPUT"
+
+  build-images:
+    needs: train
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: pdm-serve
+            dockerfile: docker/serve.Dockerfile
+          - name: pdm-train
+            dockerfile: docker/train.Dockerfile
+          - name: pdm-drift
+            dockerfile: docker/drift.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  link-image-tag:
+    needs: [train, build-images]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -e .
+
+      - name: Tag candidate model version with its image_tag
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: |
+          python -c "
+          from pdm.common.config import configure_mlflow_env
+          from pdm.evaluation.registry import set_image_tag
+          import mlflow
+          from mlflow import MlflowClient
+
+          configure_mlflow_env()
+          client = MlflowClient(tracking_uri=mlflow.get_tracking_uri())
+          set_image_tag(client, 'ims_bearing_rul', '${{ needs.train.outputs.model_version }}', '${{ github.sha }}')
+          print('Tagged ims_bearing_rul v${{ needs.train.outputs.model_version }} image_tag=${{ github.sha }}')
+          "

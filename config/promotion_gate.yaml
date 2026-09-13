@@ -1,0 +1,8 @@
+# Staging -> Production promotion gate thresholds. Tune these without touching CI
+# workflow YAML or evaluation code — scripts/promote_to_production.py reads this file.
+#
+# A candidate is eligible for promotion only if BOTH hold:
+#   candidate.f2_score  >= prod_baseline.f2_score  + min_f2_delta
+#   candidate.precision >= prod_baseline.precision - max_precision_drop
+min_f2_delta: 0.02
+max_precision_drop: 0.03

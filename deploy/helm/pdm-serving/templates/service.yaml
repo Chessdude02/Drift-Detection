@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pdm-serving-stable
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: pdm-serving
+spec:
+  selector:
+    app: pdm-serving
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pdm-serving-canary
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: pdm-serving
+spec:
+  selector:
+    app: pdm-serving
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+---
+# Shadow track: a separate low-replica Rollout receives mirrored traffic via the
+# Ingress mirror annotation (templates/ingress.yaml). Its responses are logged by
+# the app (X-Shadow header) and never returned to real users.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pdm-serving-shadow
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: pdm-serving-shadow
+spec:
+  selector:
+    app: pdm-serving-shadow
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}

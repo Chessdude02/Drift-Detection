@@ -1,0 +1,64 @@
+namespace: pdm
+
+image:
+  repository: ghcr.io/OWNER/pdm-serve
+  tag: latest
+  pullPolicy: IfNotPresent
+
+shadowImage:
+  # Candidate model image under shadow evaluation; defaults to the stable image/tag until
+  # a retrain pipeline promotes a new one via CI (see .github/workflows/build-and-push-dev.yaml).
+  repository: ghcr.io/OWNER/pdm-serve
+  tag: latest
+
+replicaCount: 2
+shadowReplicaCount: 1
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+service:
+  port: 80
+  targetPort: 8000
+
+env:
+  MLFLOW_TRACKING_URI: "http://pdm-mlflow.pdm.svc.cluster.local:5000"
+  INFERENCE_LOG_DB: "/inference-log/inference_log.db"
+  MODEL_REFRESH_SECONDS: "300"
+
+inferenceLog:
+  # true: mount a PersistentVolumeClaim named `pvcName` (must already exist in this
+  # release's namespace — deploy/k8s/pvc-inference-log.yaml creates it for the `pdm`
+  # namespace only). false: mount an emptyDir instead (ephemeral — lost on pod
+  # restart). Use false for any namespace without that PVC (e.g. staging), since the
+  # drift-check pipeline that reads this log only ever runs against the `pdm`
+  # (production) namespace's data anyway.
+  persistent: true
+  pvcName: pdm-inference-log
+
+ingress:
+  enabled: true
+  host: pdm.local
+  className: nginx
+
+rollout:
+  mode: canary # canary (full nginx traffic-routing + Prometheus analysis, prod) | simple (immediate rollout, no ingress dependency, staging)
+  canarySteps:
+    - setWeight: 10
+    - pauseSeconds: 60
+    - analysis: true
+    - setWeight: 50
+    - pauseSeconds: 60
+    - analysis: true
+    - setWeight: 100
+  analysis:
+    prometheusServer: http://prometheus-operated.monitoring.svc.cluster.local:9090
+    maxErrorRate: 0.05
+    maxP95LatencySeconds: 1.0
+    interval: 30s
+    failureLimit: 3

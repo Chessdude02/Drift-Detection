@@ -1,0 +1,30 @@
+# Serving configuration for the FastAPI app.
+model:
+  name: cmapss_rul
+  stage: Production              # MLflow registry alias/stage to load
+  refresh_seconds: 300           # how often to re-check the registry for a new version
+
+feature_schema:
+  # Must match src/pdm/data/features.py output columns (order-insensitive, by name).
+  required_columns:
+    - op_setting_1
+    - op_setting_2
+    - op_setting_3
+    - sensor_2_roll_mean_10
+    - sensor_3_roll_mean_10
+    - sensor_4_roll_mean_10
+    - sensor_7_roll_mean_10
+    - sensor_8_roll_mean_10
+    - sensor_9_roll_mean_10
+    - sensor_11_roll_mean_10
+    - sensor_12_roll_mean_10
+    - sensor_13_roll_mean_10
+    - sensor_14_roll_mean_10
+    - sensor_15_roll_mean_10
+    - sensor_17_roll_mean_10
+    - sensor_20_roll_mean_10
+    - sensor_21_roll_mean_10
+
+logging:
+  inference_log_db: inference_log.db
+  sample_rate: 1.0               # fraction of requests to persist for drift analysis

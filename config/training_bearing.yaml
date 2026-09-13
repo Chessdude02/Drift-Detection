@@ -1,0 +1,36 @@
+# Training configuration for the IMS Bearing RUL model.
+dataset:
+  type: ims_bearing
+  raw_dir: data/raw_bearing
+  rul_cap: null                  # no cap by default: a run-to-failure series' natural
+                                  # RUL range (snapshot count) is already bounded
+
+features:
+  channels: [bearing1, bearing2, bearing3, bearing4]
+  # Channel whose degradation defines RUL=0 at the last snapshot. This depends on which
+  # real IMS test-to-failure experiment raw_dir points at - see data/README.md:
+  #   2nd_test -> bearing1 (outer race failure)   <- this config assumes 2nd_test
+  #   3rd_test -> bearing3 (outer race failure)
+  #   1st_test -> not usable as-is: 8 channels (2 per bearing), not 4 - see data/README.md
+  failure_channel: bearing1
+
+model:
+  algorithm: lightgbm            # lightgbm | xgboost
+  params:
+    n_estimators: 200
+    learning_rate: 0.05
+    max_depth: 6
+    num_leaves: 31
+    random_state: 42
+    min_child_samples: 5         # IMS runs have far fewer rows than C-MAPSS; keep leaves splittable
+  val_split: 0.2                 # most recent 20% of snapshots (temporal holdout, not random)
+
+mlflow:
+  experiment_name: ims_bearing_rul
+  registered_model_name: ims_bearing_rul
+
+evaluation:
+  # Placeholder tuned for the real, full-length IMS run (hundreds of snapshots); the
+  # committed test fixture is a ~2% sample used only to exercise the pipeline end-to-end
+  # (see tests/integration/test_train_bearing.py), not to validate real-world accuracy.
+  max_rmse: 5.0

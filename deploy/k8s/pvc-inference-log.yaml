@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pdm-inference-log
+  namespace: pdm
+spec:
+  # ReadWriteMany so both the serving Deployment (writer) and the drift-check CronJob
+  # (reader) can mount it concurrently. kind's default local-path provisioner only
+  # supports RWO; for a real kind demo, swap in an RWX-capable StorageClass (e.g. NFS)
+  # or run the drift job on the same node — documented in README.md.
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi

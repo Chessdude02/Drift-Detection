@@ -1,0 +1,31 @@
+# Drift-check job configuration.
+reference:
+  path: data/processed/reference.parquet
+  min_reference_rows: 200
+
+current_window:
+  source: inference_log_db       # inference_log_db | file
+  lookback_rows: 500
+
+drift:
+  threshold: 0.5                 # share of drifted columns (Evidently DataDriftPreset) that triggers retrain
+  columns:
+    - sensor_2_roll_mean_10
+    - sensor_3_roll_mean_10
+    - sensor_4_roll_mean_10
+    - sensor_7_roll_mean_10
+    - sensor_8_roll_mean_10
+    - sensor_9_roll_mean_10
+    - sensor_11_roll_mean_10
+    - sensor_12_roll_mean_10
+    - sensor_13_roll_mean_10
+    - sensor_14_roll_mean_10
+    - sensor_15_roll_mean_10
+    - sensor_17_roll_mean_10
+    - sensor_20_roll_mean_10
+    - sensor_21_roll_mean_10
+
+retrain_trigger:
+  namespace: pdm
+  source_cronjob: pdm-retrain
+  job_name_prefix: pdm-retrain-drift

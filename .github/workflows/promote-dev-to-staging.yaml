@@ -1,0 +1,122 @@
+name: Promote Dev to Staging
+
+# Deploys a candidate's dev-built image into the `pdm-staging` namespace as a smoke test
+# (confirms the serving container boots and loads the model — Argo Rollouts reports
+# Healthy only once /readyz passes), then scores the candidate directly from its MLflow
+# artifact against the fixed holdout set (scripts/score_on_holdout.py loads the model
+# in-process via its MLflow URI — it does NOT call the staging deployment's HTTP API,
+# so the smoke test and the scoring are independent checks, not one depending on the
+# other's exact mechanism).
+#
+# Scores are logged to the `ims_bearing_rul_staging_eval` MLflow experiment (matches
+# config/evaluation.yaml's `holdout.staging_eval_mlflow_experiment` verbatim) tagged
+# `candidate_run_id` + `evaluation_stage=staging` — this is exactly what
+# promote-staging-to-prod.yaml's scripts/promote_to_production.py searches for
+# (`_find_latest_staging_eval`, same tag names, same experiment). Nothing here is
+# duplicated or renamed between the two workflows.
+#
+# The staging deployment uses rollout.mode=simple and inferenceLog.persistent=false
+# (deploy/helm/pdm-serving/values.yaml): no ingress, no Prometheus-gated canary
+# analysis (no real traffic in staging for it to gate on, and a second Ingress on the
+# same host as production would conflict), and an emptyDir instead of the
+# `pdm-inference-log` PVC (that PVC only exists in the `pdm` namespace — deploy/k8s/
+# pvc-inference-log.yaml — and the drift pipeline that reads it only ever needs
+# production's data anyway). This workflow makes NO promotion decision; that gate
+# lives entirely in promote-staging-to-prod.yaml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_name:
+        description: "MLflow registered model name"
+        required: true
+        default: "ims_bearing_rul"
+      model_version:
+        description: "Candidate's registered model version to deploy to staging and score"
+        required: true
+
+jobs:
+  deploy-and-score:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt -e .
+
+      - name: Resolve candidate run_id and image_tag
+        id: candidate
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: |
+          python -c "
+          from pdm.common.config import configure_mlflow_env
+          from pdm.evaluation.registry import get_image_tag
+          import mlflow
+          from mlflow import MlflowClient
+
+          configure_mlflow_env()
+          client = MlflowClient(tracking_uri=mlflow.get_tracking_uri())
+          v = client.get_model_version('${{ inputs.model_name }}', '${{ inputs.model_version }}')
+          if not v.run_id:
+              raise SystemExit(f'Model version ${{ inputs.model_version }} has no run_id')
+          image_tag = get_image_tag(v)
+          if not image_tag:
+              raise SystemExit(
+                  f'Model version ${{ inputs.model_version }} has no image_tag set - '
+                  'run build-and-push-dev.yaml for it first'
+              )
+          print(f'run_id={v.run_id}')
+          print(f'image_tag={image_tag}')
+          " | tee candidate.env
+          echo "run_id=$(grep '^run_id=' candidate.env | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$(grep '^image_tag=' candidate.env | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install Argo Rollouts kubectl plugin
+        run: |
+          curl -sSL -o kubectl-argo-rollouts https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/
+
+      - name: Configure kubeconfig
+        run: echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig.yaml
+
+      - name: Deploy candidate to staging
+        env:
+          KUBECONFIG: kubeconfig.yaml
+        run: |
+          helm upgrade --install pdm-serving-staging deploy/helm/pdm-serving \
+            --namespace pdm-staging --create-namespace \
+            --set namespace=pdm-staging \
+            --set rollout.mode=simple \
+            --set ingress.enabled=false \
+            --set replicaCount=1 \
+            --set shadowReplicaCount=0 \
+            --set inferenceLog.persistent=false \
+            --set image.tag=${{ steps.candidate.outputs.image_tag }} \
+            --wait --timeout 5m
+
+      - name: Smoke test (candidate serves and reports healthy)
+        env:
+          KUBECONFIG: kubeconfig.yaml
+        run: kubectl argo rollouts status pdm-serving -n pdm-staging --timeout 180s
+
+      - name: Score candidate against the fixed holdout set
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: |
+          python scripts/score_on_holdout.py \
+            --model-uri "models:/${{ inputs.model_name }}/${{ inputs.model_version }}" \
+            --candidate-run-id "${{ steps.candidate.outputs.run_id }}"

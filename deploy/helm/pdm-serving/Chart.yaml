@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pdm-serving
+description: Predictive-maintenance FastAPI serving app with Argo Rollouts canary + shadow deploy
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

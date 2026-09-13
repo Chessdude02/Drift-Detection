@@ -1,0 +1,142 @@
+# Staged deploy + rollback: replaces a plain Deployment with an Argo Rollouts `Rollout`
+# so `helm upgrade` (triggered by .github/workflows/deploy.yaml) drives a canary rollout
+# with Prometheus-gated analysis steps, instead of an all-at-once update.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: pdm-serving
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: pdm-serving
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: pdm-serving
+  template:
+    metadata:
+      labels:
+        app: pdm-serving
+    spec:
+      serviceAccountName: pdm-serving
+      containers:
+        - name: serving
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          volumeMounts:
+            - name: inference-log
+              mountPath: /inference-log
+            - name: config
+              mountPath: /app/config
+      volumes:
+        - name: inference-log
+          {{- if .Values.inferenceLog.persistent }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.inferenceLog.pvcName }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: config
+          configMap:
+            name: pdm-serving-config
+  strategy:
+    canary:
+      canaryService: pdm-serving-canary
+      stableService: pdm-serving-stable
+      {{- if eq .Values.rollout.mode "canary" }}
+      # Full staged rollout: nginx-weighted traffic shifting gated by Prometheus
+      # analysis (deploy/helm/pdm-serving/templates/analysistemplate.yaml). Depends on
+      # the stable Ingress (templates/ingress.yaml) existing, so requires
+      # ingress.enabled=true — this is the production path.
+      trafficRouting:
+        nginx:
+          stableIngress: pdm-serving
+      steps:
+        {{- range .Values.rollout.canarySteps }}
+        {{- if .setWeight }}
+        - setWeight: {{ .setWeight }}
+        {{- else if .pauseSeconds }}
+        - pause: { duration: {{ .pauseSeconds }}s }
+        {{- else if .analysis }}
+        - analysis:
+            templates:
+              - templateName: pdm-serving-analysis
+            args:
+              - name: service-name
+                value: pdm-serving-canary
+        {{- end }}
+        {{- end }}
+      {{- else }}
+      # rollout.mode=simple: no ingress-based traffic routing and no Prometheus
+      # analysis steps — an immediate full rollout once pods pass readiness, still
+      # versioned/undo-able via `kubectl argo rollouts`. Used for the staging
+      # environment (deploy/pdm-serving-staging), which has no real traffic for the
+      # AnalysisTemplate's error-rate/latency queries to gate on and doesn't need a
+      # second Ingress competing for the same host as production.
+      {{- end }}
+---
+# Shadow track: a fixed, low-replica Deployment running the retrain-candidate image.
+# It never receives real user traffic directly — only mirrored copies via the Ingress
+# mirror annotation (templates/ingress.yaml) — so a plain Deployment (not a Rollout) is
+# sufficient here; promotion means retagging this image and letting the stable Rollout
+# above canary it in, not routing live traffic to this Deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdm-serving-shadow
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: pdm-serving-shadow
+spec:
+  replicas: {{ .Values.shadowReplicaCount }}
+  selector:
+    matchLabels:
+      app: pdm-serving-shadow
+  template:
+    metadata:
+      labels:
+        app: pdm-serving-shadow
+    spec:
+      serviceAccountName: pdm-serving
+      containers:
+        - name: serving
+          image: "{{ .Values.shadowImage.repository }}:{{ .Values.shadowImage.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5

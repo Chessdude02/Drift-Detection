@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pdm-recording-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: pdm.recording
+      interval: 30s
+      rules:
+        - record: pdm:error_rate:ratio5m
+          expr: |
+            sum(rate(pdm_predictions_total{status="error", shadow="false"}[5m]))
+            /
+            clamp_min(sum(rate(pdm_predictions_total{shadow="false"}[5m])), 1)
+        - record: pdm:latency_p95:5m
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(pdm_request_latency_seconds_bucket{shadow="false"}[5m])) by (le)
+            )
+        - record: pdm:request_rate:5m
+          expr: sum(rate(pdm_predictions_total{shadow="false"}[5m]))

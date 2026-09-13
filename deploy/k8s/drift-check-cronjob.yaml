@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pdm-drift-check
+  namespace: pdm
+spec:
+  schedule: "*/30 * * * *" # every 30 minutes
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: pdm-drift-check
+          restartPolicy: Never
+          containers:
+            - name: drift-check
+              image: ghcr.io/OWNER/pdm-drift:latest
+              env:
+                - name: MLFLOW_TRACKING_URI
+                  value: "http://pdm-mlflow.pdm.svc.cluster.local:5000"
+                - name: INFERENCE_LOG_DB
+                  value: "/inference-log/inference_log.db"
+                - name: PROMETHEUS_PUSHGATEWAY_URL
+                  value: "http://prometheus-pushgateway.monitoring.svc.cluster.local:9091"
+                - name: KUBE_NAMESPACE
+                  value: "pdm"
+              volumeMounts:
+                - name: inference-log
+                  mountPath: /inference-log
+              resources:
+                requests: { cpu: "100m", memory: "256Mi" }
+                limits: { cpu: "500m", memory: "512Mi" }
+          volumes:
+            - name: inference-log
+              persistentVolumeClaim:
+                claimName: pdm-inference-log
