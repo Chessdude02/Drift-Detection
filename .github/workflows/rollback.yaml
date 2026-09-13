@@ -79,6 +79,13 @@ jobs:
       - name: Configure kubeconfig
         run: echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig.yaml
 
+      - name: Compute lowercase image owner
+        # GitHub Actions has NO built-in case-conversion expression function - GHCR
+        # repository names must be lowercase, github.repository_owner isn't guaranteed
+        # to be. Computed via the shell instead.
+        id: vars
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Revert K8s deployment to the restored version's image
         env:
           KUBECONFIG: kubeconfig.yaml
@@ -86,7 +93,7 @@ jobs:
           helm upgrade --install pdm-serving deploy/helm/pdm-serving \
             --namespace pdm --create-namespace \
             --reuse-values \
-            --set image.repository=ghcr.io/${{ toLower(github.repository_owner) }}/pdm-serve \
+            --set image.repository=ghcr.io/${{ steps.vars.outputs.owner }}/pdm-serve \
             --set image.tag=${{ steps.rollback.outputs.image_tag }} \
             --wait --timeout 5m
 
