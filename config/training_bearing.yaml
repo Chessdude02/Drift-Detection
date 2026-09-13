@@ -33,10 +33,35 @@ mlflow:
   registered_model_name: ims_bearing_rul
 
 evaluation:
-  # Calibrated against real training runs on the full 2nd_test dataset (984 rows):
-  # val_rmse has consistently come out to ~61.1 across repeated identical runs
-  # (deterministic given the fixed random_state), so 70.0 gates on genuine regressions
-  # with a reasonable margin rather than being either a rubber stamp or an unpassable
-  # placeholder. The old value (5.0) predates having any real training data at all and
-  # blocked every real run's gate unconditionally - see RUNBOOK.md.
+  # max_rmse is NOT chosen as "current val_rmse plus a comfortable margin" - the
+  # previous comment here claimed that and was wrong to. The operationally relevant
+  # comparison is val_rmse against config/evaluation.yaml's failure_horizon_snapshots
+  # (30): that's the decision window a deployed model's predictions actually gate -
+  # "is this bearing failing within the next 30 snapshots (~5 hours)". If RMSE is
+  # small relative to that window, a prediction near the boundary is reliable; if RMSE
+  # is comparable to or larger than the window, prediction error swamps the decision
+  # itself, regardless of what the training gate says.
+  #
+  # val_rmse has consistently come out to ~61.1 (deterministic, fixed random_state) -
+  # that is 2.0x the 30-snapshot failure_horizon, not a small fraction of it. This
+  # directly explains, not just correlates with, what holdout_v1.csv scoring showed at
+  # horizon=30: precision=0.52 - roughly HALF of "failing soon" alerts are false
+  # alarms. That is not a rounding error and not a bug; it is what RMSE 2x the
+  # decision window predicts. A model whose error is this large relative to the
+  # window it gates is not operationally trustworthy for confident near-boundary
+  # classification, full stop.
+  #
+  # So: max_rmse=70.0 only gates against gross regression from the current (already
+  # weak) baseline. val_rmse sits at 61.088/70.0 = 87% of this threshold - ~13%
+  # headroom, not a comfortable buffer. A retrain with similar or marginally worse
+  # RMSE would still pass without being any more trustworthy at the decision boundary;
+  # a materially worse run would be caught. Do not read gate_passed=True as "this
+  # model is ready" - it only means "not obviously worse than what we already have,
+  # which itself isn't good enough yet."
+  #
+  # The bar for "operationally sound near the decision boundary" would be RMSE
+  # comparable to or smaller than failure_horizon (<=30, ideally well under it). The
+  # current model does not clear that bar. Getting there is model-quality work (better
+  # features, different split/model choice - see RUNBOOK.md's "known gaps (failure-
+  # horizon calibration)" section), not a config-threshold change.
   max_rmse: 70.0
