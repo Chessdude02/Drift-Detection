@@ -86,6 +86,7 @@ jobs:
           helm upgrade --install pdm-serving deploy/helm/pdm-serving \
             --namespace pdm --create-namespace \
             --reuse-values \
+            --set image.repository=ghcr.io/${{ toLower(github.repository_owner) }}/pdm-serve \
             --set image.tag=${{ steps.rollback.outputs.image_tag }} \
             --wait --timeout 5m
 

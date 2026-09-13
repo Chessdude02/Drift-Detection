@@ -121,6 +121,7 @@ jobs:
             --set replicaCount=1 \
             --set shadowReplicaCount=0 \
             --set inferenceLog.persistent=false \
+            --set image.repository=ghcr.io/${{ toLower(github.repository_owner) }}/pdm-serve \
             --set image.tag=${{ steps.candidate.outputs.image_tag }} \
             --wait --timeout 5m
 
