@@ -36,6 +36,33 @@ spec:
               sensor also nudges the others' scores). This alert does NOT trigger
               retraining: retraining on a broken sensor's data would bake the fault in.
 
+        - alert: RetrainHeldForSensorFault
+          expr: pdm_drift_check_action{action="hold_for_sensor_fault"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Drift-triggered retrain is on hold: a sensor looks faulty"
+            description: >
+              The latest drift check crossed the retrain threshold, but the sensor-fault
+              check also fired, so no retrain Job was created. Retraining on a broken
+              sensor's data would bake the fault into the model. See RUNBOOK.md
+              "RetrainHeldForSensorFault".
+
+        - alert: DriftCheckSkipped
+          expr: |
+            pdm_drift_check_action{action=~"skip_too_few_engines|skip_no_data"} == 1
+          for: 6h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Drift check has been skipped for 6h ({{ $labels.action }})"
+            description: >
+              The drift check is not running: either no traffic, or fewer engines per
+              window than current_window.min_engines (see pdm_drift_window_engines). The
+              model is unmonitored for drift while this fires. See RUNBOOK.md
+              "DriftCheckSkipped".
+
         - alert: ServingErrorRateSpike
           expr: |
             sum(rate(pdm_predictions_total{status="error", shadow="false"}[5m]))

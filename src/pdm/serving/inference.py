@@ -14,6 +14,23 @@ def validate_features(features: dict[str, float], required_columns: list[str]) -
     return [c for c in required_columns if c not in features]
 
 
+def non_finite_features(features: dict[str, float], required_columns: list[str]) -> list[str]:
+    """Required columns whose value is NaN or +/-infinity."""
+    return [c for c in required_columns if not math.isfinite(float(features[c]))]
+
+
+def out_of_range_features(
+    features: dict[str, float], ranges: dict[str, tuple[float, float]] | None
+) -> list[str]:
+    """Columns outside the [low, high] range seen in training (stored in the model
+    bundle; see pdm.training.train.fit_bundle). Empty when the model has no ranges."""
+    if not ranges:
+        return []
+    return [
+        c for c, (low, high) in ranges.items() if c in features and not low <= features[c] <= high
+    ]
+
+
 def predict_details(model, features: dict[str, float], required_columns: list[str]) -> dict:
     """Builds the single-row model input in the required column order and returns
     {"rul", "rul_lower", "rul_upper", "maintenance_recommended"}. Models that return a

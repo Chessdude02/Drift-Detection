@@ -5,7 +5,13 @@ reference:
 
 current_window:
   source: inference_log_db       # inference_log_db | file
+  # Readings from the last lookback_hours (null = ignore time and use the last
+  # lookback_rows), capped at lookback_rows so one check stays cheap.
+  lookback_hours: 24
   lookback_rows: 500
+  # Fewer distinct engines than this and the check is skipped: with 1-3 engines both
+  # checks give 15-94% false alarms (decisions.md D8). Needs asset_id on requests.
+  min_engines: 5
 
 drift:
   threshold: 0.5                 # share of drifted columns (Evidently DataDriftPreset) that triggers retrain
@@ -51,6 +57,9 @@ life_stage_matching:
 sensor_check:
   enabled: true
   threshold: 0.46
+  # When drift says "retrain" but a sensor also looks faulty, hold the retrain for a
+  # human instead (a broken sensor tripped the retrain check up to 9% of the time).
+  hold_retrain_on_fault: true
 
 retrain_trigger:
   namespace: pdm

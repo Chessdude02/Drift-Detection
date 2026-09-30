@@ -18,6 +18,15 @@ class LoadedModel:
     model: Any
     name: str
     version: str
+    # {feature: (low, high)} seen in training, when the model bundle records it.
+    feature_ranges: dict | None = None
+
+
+def _feature_ranges(model) -> dict | None:
+    try:
+        return model.unwrap_python_model().bundle.info.get("feature_ranges")
+    except Exception:  # not a pdm RULPyfunc bundle (e.g. a plain lightgbm model)
+        return None
 
 
 class ModelLoader:
@@ -51,7 +60,12 @@ class ModelLoader:
             )
         latest = versions[0]
         model = mlflow.pyfunc.load_model(f"models:/{self.model_name}/{self.stage}")
-        loaded = LoadedModel(model=model, name=self.model_name, version=latest.version)
+        loaded = LoadedModel(
+            model=model,
+            name=self.model_name,
+            version=str(latest.version),
+            feature_ranges=_feature_ranges(model),
+        )
         with self._lock:
             self._loaded = loaded
         logger.info(

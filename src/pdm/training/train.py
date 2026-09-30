@@ -141,6 +141,12 @@ def fit_bundle(feature_df, cols: list[str], config: dict, split_fn) -> dict:
         val_df["rul"],
         coverage=coverage,
     )
+    # Training range per feature (5% margin each side); serving flags readings outside it.
+    lo, hi = train_df[cols].min(), train_df[cols].max()
+    margin = (hi - lo) * 0.05
+    bundle.info["feature_ranges"] = {
+        c: (float(lo[c] - margin[c]), float(hi[c] + margin[c])) for c in cols
+    }
     val_frame = bundle.predict_frame(val_df[cols])
     metrics = {"val_rmse": rmse(val_df["rul"], val_frame["rul"])}
     if coverage is not None:

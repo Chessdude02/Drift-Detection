@@ -57,7 +57,9 @@ def test_readyz_false_without_model(tmp_path, monkeypatch):
 
 
 def test_predict_happy_path(client):
-    resp = client.post("/predict", json={"features": _sample_features(client)})
+    resp = client.post(
+        "/predict", json={"asset_id": "engine-1", "features": _sample_features(client)}
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["predicted_rul"] == 42.0
@@ -65,7 +67,7 @@ def test_predict_happy_path(client):
 
 
 def test_predict_missing_features_returns_422(client):
-    resp = client.post("/predict", json={"features": {}})
+    resp = client.post("/predict", json={"asset_id": "engine-1", "features": {}})
     assert resp.status_code == 422
 
 
@@ -76,13 +78,61 @@ def test_predict_without_model_returns_503(tmp_path, monkeypatch):
 
     with TestClient(app) as c:
         required = c.app.state.required_columns
-        resp = c.post("/predict", json={"features": {col: 1.0 for col in required}})
+        resp = c.post(
+            "/predict", json={"asset_id": "engine-1", "features": {col: 1.0 for col in required}}
+        )
         assert resp.status_code == 503
 
 
 def test_predict_shadow_header_marks_response(client):
     resp = client.post(
-        "/predict", json={"features": _sample_features(client)}, headers={"X-Shadow": "true"}
+        "/predict",
+        json={"asset_id": "engine-1", "features": _sample_features(client)},
+        headers={"X-Shadow": "true"},
     )
     assert resp.status_code == 200
     assert resp.headers.get("x-shadow") == "true"
+
+
+def test_predict_without_asset_id_is_rejected(client):
+    resp = client.post("/predict", json={"features": _sample_features(client)})
+    assert resp.status_code == 422
+    assert "asset_id" in resp.text
+
+
+def test_predict_non_finite_feature_is_rejected(client):
+    features = _sample_features(client)
+    first = next(iter(features))
+    body = '{"asset_id": "engine-1", "features": {%s}}' % ", ".join(
+        f'"{k}": {"NaN" if k == first else v}' for k, v in features.items()
+    )
+    resp = client.post("/predict", content=body, headers={"content-type": "application/json"})
+    assert resp.status_code == 422
+    assert first in resp.text
+
+
+def test_out_of_range_feature_is_flagged_not_rejected(client):
+    features = _sample_features(client)
+    first = next(iter(features))
+    loaded = client.app.state.loader._loaded
+    loaded.feature_ranges = {first: (0.0, 0.5)}
+    resp = client.post("/predict", json={"asset_id": "engine-1", "features": features})
+    assert resp.status_code == 200
+    assert resp.json()["input_warnings"] == [f"{first} outside training range"]
+
+
+def test_asset_cycle_and_warnings_reach_the_inference_log(client):
+    features = _sample_features(client)
+    client.post(
+        "/predict",
+        json={
+            "asset_id": "engine-7",
+            "cycle": 42,
+            "observed_at": "2026-01-01T00:00:00Z",
+            "features": features,
+        },
+    )
+    row = client.app.state.inference_log.read_recent(1)[0]
+    assert row["asset_id"] == "engine-7" and row["cycle"] == 42
+    assert row["observed_at"] == 1767225600.0
+    assert row["model_version"] == "1"

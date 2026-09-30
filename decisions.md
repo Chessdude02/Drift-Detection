@@ -190,7 +190,7 @@ install: it resolved to 2.0.54, and an MLflow run logged to SQLite.
 
 ## D8. Windows need about 5+ engines; not enforced yet
 
-**Status:** Open
+**Status:** Resolved by D15 (kept for the numbers)
 
 **Problem.** With few engines in a window, one engine's quirks look like drift or a fault
 (benchmark, false retrain / false sensor alert):
@@ -211,7 +211,7 @@ engine a reading came from, so the drift job can't count engines.
 
 ## D9. A broken sensor can still trigger a retrain
 
-**Status:** Open
+**Status:** Resolved by D16 (kept for the numbers)
 
 **Problem.** In calibration, a single broken sensor tripped the retrain check up to 9% of
 the time (0% for a 0.5 std offset, 5-9% for larger offsets or a stuck sensor).
@@ -327,3 +327,47 @@ cost by 8%, more than the 5% tolerance. A retrain on identical data (v3) was
 depend on luck. Fix: reduce seed-to-seed variance, for example by averaging several
 seeds (tested in Phase F), or by widening the tolerance, at the cost of catching fewer
 real regressions.
+
+## D15. Require an engine ID on every prediction, and enforce 5+ engines per window
+
+**Status:** Accepted
+
+**Problem.** Without knowing which engine a reading came from:
+- the drift check can't count engines (D8), and
+- failures and maintenance can't be matched back to predictions to make new labels
+  (Phase D).
+
+**Decision.**
+- `/predict` takes `asset_id`, plus optional `cycle` and `observed_at`.
+- `asset_id` is required by default (`serving.yaml input_validation.require_asset_id`).
+- The inference log gained those columns, plus the model version and any input
+  warnings. Existing databases are upgraded in place.
+- The drift job reads the last 24 hours (capped at 500 rows) instead of the last 500
+  rows, and skips the check when the window has fewer than 5 engines.
+- The `DriftCheckSkipped` alert fires if that goes on for 6 hours.
+
+**Cost.**
+- **This breaks the API:** clients that don't send `asset_id` get a 422 error. Setting
+  `require_asset_id: false` restores the old behaviour, but then the engine minimum
+  can't be enforced.
+- A small fleet that never reaches 5 engines a day gets no drift monitoring. That's
+  deliberate: a check that is wrong 15-60% of the time is worse than none, and the
+  alert makes the gap visible.
+
+## D16. Validate inputs at the door; hold drift retrains when a sensor looks broken
+
+**Status:** Accepted
+
+**Decision.**
+- Missing features, a missing `asset_id`, or NaN/infinite values get a 422 error,
+  counted in `pdm_input_rejected_total{reason}`.
+- Values outside the training range (plus a 5% margin, stored in the model) are
+  **accepted but flagged**: the response carries `input_warnings`, and the count goes
+  to `pdm_input_out_of_range_total{feature}`. A genuinely unusual reading should reach
+  the drift and sensor checks, not be thrown away.
+- If a check says "retrain" and the sensor-fault check also fires, the retrain is held.
+  The `RetrainHeldForSensorFault` alert fires and a human decides.
+  (`sensor_check.hold_retrain_on_fault`.)
+
+**Cost.** A held retrain waits for a person. That's intended: an automatic retrain on
+possibly bad data is the riskier default.

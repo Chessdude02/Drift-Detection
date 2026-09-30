@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 
 import pandas as pd
 from evidently.metric_preset import DataDriftPreset
@@ -125,17 +126,23 @@ def evaluate_window(
 
 
 def push_metrics(
-    drift_score: float,
+    drift_score: float | None,
     sensor_scores: dict[str, float],
     flagged_sensors: list[str],
     pushgateway_url: str,
+    action: str,
+    n_engines: int | None,
     job: str = "pdm_drift_check",
 ) -> None:
+    """`action` is the outcome of decide_action; it is pushed as one-hot gauges so
+    alerts can fire on a held retrain or a check that keeps being skipped."""
     registry = CollectorRegistry()
-    gauge = Gauge(
-        "pdm_drift_score", "Share of drifted columns from the latest drift check", registry=registry
-    )
-    gauge.set(drift_score)
+    if drift_score is not None:
+        Gauge(
+            "pdm_drift_score",
+            "Share of drifted columns from the latest drift check",
+            registry=registry,
+        ).set(drift_score)
     if sensor_scores:
         score_gauge = Gauge(
             "pdm_sensor_fault_score",
@@ -152,10 +159,57 @@ def push_metrics(
         for sensor, value in sensor_scores.items():
             score_gauge.labels(sensor=sensor).set(value)
             fault_gauge.labels(sensor=sensor).set(1 if sensor in flagged_sensors else 0)
+    action_gauge = Gauge(
+        "pdm_drift_check_action",
+        "1 for the latest drift check's outcome: none, retrain, hold_for_sensor_fault, "
+        "skip_too_few_engines or skip_no_data",
+        ["action"],
+        registry=registry,
+    )
+    for name in ACTIONS:
+        action_gauge.labels(action=name).set(1 if name == action else 0)
+    if n_engines is not None:
+        Gauge(
+            "pdm_drift_window_engines",
+            "Distinct engines in the latest drift-check window",
+            registry=registry,
+        ).set(n_engines)
     try:
         push_to_gateway(pushgateway_url, job=job, registry=registry)
     except Exception:
         logger.exception("Failed to push drift metrics to Pushgateway at %s", pushgateway_url)
+
+
+ACTIONS = ("none", "retrain", "hold_for_sensor_fault", "skip_too_few_engines", "skip_no_data")
+
+
+def count_engines(rows: list[dict]) -> int | None:
+    """Distinct asset ids in the window, or None if no row carries one (legacy clients),
+    in which case the minimum cannot be enforced."""
+    ids = {r["asset_id"] for r in rows if r.get("asset_id")}
+    return len(ids) if ids else None
+
+
+def decide_action(
+    n_engines: int | None,
+    drift_share: float | None,
+    faulty: list[str],
+    config: dict,
+) -> str:
+    """What the drift job should do. Pure, so the policy is testable:
+    - skip_too_few_engines: under current_window.min_engines, both checks give 15-60%
+      false alarms (decisions.md D8), so no decision is made at all.
+    - hold_for_sensor_fault: drift says retrain, but a sensor also looks broken.
+      Retraining on a broken sensor's data would bake the fault in; a human decides.
+    """
+    min_engines = config["current_window"].get("min_engines")
+    if min_engines and n_engines is not None and n_engines < min_engines:
+        return "skip_too_few_engines"
+    if drift_share is None or drift_share <= config["drift"]["threshold"]:
+        return "none"
+    if faulty and config.get("sensor_check", {}).get("hold_retrain_on_fault", True):
+        return "hold_for_sensor_fault"
+    return "retrain"
 
 
 def trigger_retrain_if_needed(
@@ -180,6 +234,62 @@ def trigger_retrain_if_needed(
     return True
 
 
+def read_window(inference_log: InferenceLog, window_cfg: dict) -> list[dict]:
+    """Non-shadow rows of the current window: the last `lookback_hours` (capped at
+    `lookback_rows`) when lookback_hours is set, else the last `lookback_rows` rows.
+
+    Shadow rows are mirrored copies of live requests scored by a candidate model:
+    counting them would double-count inputs and mix another model's predictions into
+    life-stage matching.
+    """
+    hours = window_cfg.get("lookback_hours")
+    limit = window_cfg["lookback_rows"]
+    if hours:
+        rows = inference_log.read_since(time.time() - hours * 3600, limit=limit)
+    else:
+        rows = inference_log.read_recent(limit=limit)
+    return [r for r in rows if not r["shadow"]]
+
+
+def run_check(reference_df: pd.DataFrame, rows: list[dict], config: dict) -> dict:
+    """One drift check over already-read rows. Returns the evaluation plus the action."""
+    n_engines = count_engines(rows)
+    if not rows:
+        return {"action": "skip_no_data", "n_engines": 0, "evaluation": None}
+    if n_engines is None:
+        logger.warning(
+            "No asset_id on any row in the window; cannot enforce min_engines. Clients "
+            "should send asset_id (serving.yaml input_validation.require_asset_id)."
+        )
+    action = decide_action(n_engines, None, [], config)
+    if action == "skip_too_few_engines":
+        logger.warning(
+            "Only %s engines in the window (< min_engines=%s); skipping drift check",
+            n_engines,
+            config["current_window"]["min_engines"],
+        )
+        return {"action": action, "n_engines": n_engines, "evaluation": None}
+
+    current_df = pd.DataFrame(
+        [{**r["features"], CURRENT_PREDICTION_COLUMN: r["prediction"]} for r in rows]
+    )
+    columns = [
+        c
+        for c in config["drift"]["columns"]
+        if c in reference_df.columns and c in current_df.columns
+    ]
+    if not columns:
+        raise ValueError("No overlapping drift columns between reference and current data")
+    evaluation = evaluate_window(reference_df, current_df, columns, config)
+    action = decide_action(
+        n_engines,
+        evaluation["drift"]["share_of_drifted_columns"],
+        evaluation["faulty_sensors"],
+        config,
+    )
+    return {"action": action, "n_engines": n_engines, "evaluation": evaluation}
+
+
 def main() -> int:
     setup_logging()
     parser = argparse.ArgumentParser(
@@ -201,46 +311,46 @@ def main() -> int:
         )
         return 1
 
-    inference_log = InferenceLog(settings.inference_log_db)
-    rows = inference_log.read_recent(limit=config["current_window"]["lookback_rows"])
-    # Shadow rows are mirrored copies of live requests scored by a candidate model:
-    # counting them would double-count inputs and mix another model's predictions into
-    # life-stage matching.
-    rows = [r for r in rows if not r["shadow"]]
-    if not rows:
-        logger.warning("No recent inference rows found; skipping drift check")
-        return 0
-    current_df = pd.DataFrame(
-        [{**r["features"], CURRENT_PREDICTION_COLUMN: r["prediction"]} for r in rows]
-    )
-
-    columns = [
-        c
-        for c in config["drift"]["columns"]
-        if c in reference_df.columns and c in current_df.columns
-    ]
-    if not columns:
-        logger.error("No overlapping drift columns between reference and current data")
+    rows = read_window(InferenceLog(settings.inference_log_db), config["current_window"])
+    try:
+        outcome = run_check(reference_df, rows, config)
+    except ValueError:
+        logger.exception("Drift check failed")
         return 1
 
-    result = evaluate_window(reference_df, current_df, columns, config)
-    score = result["drift"]["share_of_drifted_columns"]
-    logger.info("Drift check result: %s", result["drift"])
-    if result["faulty_sensors"]:
+    action, evaluation = outcome["action"], outcome["evaluation"]
+    score = evaluation["drift"]["share_of_drifted_columns"] if evaluation else None
+    sensor_scores = evaluation["sensor_scores"] if evaluation else {}
+    faulty = evaluation["faulty_sensors"] if evaluation else []
+    logger.info(
+        "Drift check: action=%s engines=%s drift=%s",
+        action,
+        outcome["n_engines"],
+        evaluation["drift"] if evaluation else None,
+    )
+    if faulty:
         logger.warning(
             "Suspected sensor fault (inspect, do not retrain): %s",
-            {s: round(result["sensor_scores"][s], 3) for s in result["faulty_sensors"]},
+            {s: round(sensor_scores[s], 3) for s in faulty},
+        )
+    if action == "hold_for_sensor_fault":
+        logger.warning(
+            "Drift %.3f is over the retrain threshold, but retraining is HELD because a "
+            "sensor looks faulty. Fix or rule out the sensor, then trigger the retrain by hand.",
+            score,
         )
 
     if not args.dry_run:
         push_metrics(
             score,
-            result["sensor_scores"],
-            result["faulty_sensors"],
+            sensor_scores,
+            faulty,
             settings.prometheus_pushgateway_url,
+            action=action,
+            n_engines=outcome["n_engines"],
         )
-
-    trigger_retrain_if_needed(score, config["drift"]["threshold"], config, dry_run=args.dry_run)
+    if action == "retrain":
+        trigger_retrain_if_needed(score, config["drift"]["threshold"], config, args.dry_run)
     return 0
 
 

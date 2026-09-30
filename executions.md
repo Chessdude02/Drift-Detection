@@ -182,3 +182,17 @@ python -m pdm.training.retrain --raw-dir data/raw        # train + gate in one s
 - The first interval attempt used LightGBM quantile models. The upper bound came out as
   exactly 125 on every row (D12), so the bounds were switched to scikit-learn.
 - Tests: 110 passed, plus the one failure that predates these changes.
+
+## 11. Phase 2B: engine IDs, input validation, drift-window rules
+
+No new measurements. The window-size numbers behind `min_engines: 5` are in section 8
+and D8. Checked by tests:
+
+- `tests/unit/test_serving_api.py`: 422 without `asset_id` and for NaN values;
+  out-of-range values flagged but still predicted; `asset_id`, `cycle`, `observed_at`
+  and model version reach the log.
+- `tests/unit/test_inference_log.py`: an old-schema database is upgraded in place, and
+  its old rows keep working.
+- `tests/unit/test_drift_actions.py`: skip under 5 engines, hold on sensor fault,
+  sensor alert alone never retrains, shadow rows dropped, time window.
+- Suite: 128 passed, plus the one failure that predates these changes.
