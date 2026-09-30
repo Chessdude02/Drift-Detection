@@ -928,6 +928,9 @@ code states a reason, it's in the relevant module's docstring.
     integration tests pass.
   - **Also found while checking:** `tests/unit/test_config_consistency.py` (added in
     D-2) had no `unit`/`integration` marker, so CI never ran it. It's marked now, and
-    no test is left unmarked. CI result on the push: Not yet measured.
+    no test is left unmarked.
+  - **CI on the push (`53ab9bc`): green** in 3 min 18 s, lint, format, unit and
+    integration included. The integration suite, the end-to-end loop included, ran in
+    CI for the first time.
 - **Evidence:** PR #2 comment 5921043519; `tests/unit/test_config.py`.
 - **Related:** D-2, D-10.
