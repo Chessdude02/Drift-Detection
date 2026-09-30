@@ -242,3 +242,88 @@ a human to confirm. Not done here, to keep this change focused. It's a small cha
   model or reference data change.
 - **The bearing dataset (IMS) was not benchmarked here.** The RUNBOOK's bearing numbers
   come from one failure event.
+
+---
+
+# Phase 2: making the loop real-world
+
+## D11. Freeze 20 FD001 engines as a holdout that no model ever trains on
+
+**Status:** Accepted
+
+**Problem.** Judging maintenance decisions needs each engine's full history to failure.
+NASA's test set stops each engine early, so you can't tell whether a maintenance call
+was in time.
+
+**Decision.** `scripts/build_cmapss_holdout.py` picked 20 of the 100 FD001 training
+engines (seed 2024) and wrote them to `data/holdout/cmapss_FD001_holdout_v1.json`.
+Training drops them (`dataset.holdout_units_file`), and every model is judged on them.
+The file is frozen: a change means a new version, never an edit.
+
+**Cost.**
+- Training uses 80 engines instead of 100. With seed 42, internal validation RMSE went
+  from 18.9 to 24.9. That split is noisy (±2.6 across seeds), so part of the change is
+  which engines landed in validation. NASA test RMSE stayed about the same (22.7 vs
+  22.3 ± 0.8).
+- 20 failures is a small sample, so decision-cost differences under about 5-10% are
+  noise (see D14).
+
+## D12. Serve a calibrated interval, using scikit-learn for the bounds
+
+**Status:** Accepted
+
+**Decision.**
+- Each model is now a bundle (`src/pdm/training/rul_model.py`): the LightGBM point
+  model, two quantile models, and a conformal correction measured on the validation
+  engines.
+- `/predict` returns `rul_lower` and `rul_upper`, aiming for 90% of true values inside.
+
+**What went wrong first.** LightGBM's quantile mode predicted exactly 125 for every row
+as the upper bound, because about half the training targets sit at the 125 cap. The
+bound never moved. scikit-learn's quantile model learns a real bound (about 30 near
+failure, about 110 far from it), so both bounds use it.
+
+**Result.** On NASA's test set, 91% of true values fall inside, with an average width
+of 65 cycles.
+
+**Cost.** 65 cycles is wide. The interval is honest, but it tells a planner less than
+they'd want. A better model (Phase F) is the way to narrow it.
+
+## D13. Score models on maintenance decisions, and ship the threshold with the model
+
+**Status:** Accepted
+
+**Decision.**
+- `src/pdm/evaluation/decision.py` replays each engine and applies "schedule maintenance
+  when the lower bound drops to H, with a 10-cycle lead time". It counts failures
+  (late or missed) and wasted life, and prices them from `config/decision.yaml`.
+- Training picks the cheapest H on the validation engines and stores it inside the
+  model. `/predict` returns `maintenance_recommended`.
+
+**Cost.** The costs are **placeholders** (a failure costs 10x a planned visit). The
+chosen threshold depends heavily on that ratio, so it must be set with real numbers
+before anyone relies on it.
+
+## D14. Champion/challenger gate replaces the fixed RMSE gate for promotion
+
+**Status:** Accepted
+
+**Decision.**
+- `src/pdm/evaluation/champion_challenger.py` re-scores the Production model and the
+  candidate on the same frozen data each time: the 20 holdout engines plus NASA's
+  test set.
+- The candidate is promoted only if it's no worse on every check: cost within 5%, no
+  extra failures, RMSE within 1, coverage at least 80%, RMSE at most 30.
+- The first promotion needs a human to confirm.
+- The retrain job now runs `python -m pdm.training.retrain`: train, then gate. A
+  rejected candidate stays registered but is never promoted.
+
+**Why "no worse" instead of "better".** A retrain on newer data that is no worse is
+worth shipping, and 20 engines can't reliably show a small improvement.
+
+**Weakness found while testing (Open).** Changing only the random seed moved decision
+cost by 8%, more than the 5% tolerance. A retrain on identical data (v3) was
+**rejected** because the model it faced (v2) had a lucky seed. So promotions partly
+depend on luck. Fix: reduce seed-to-seed variance, for example by averaging several
+seeds (tested in Phase F), or by widening the tolerance, at the cost of catching fewer
+real regressions.

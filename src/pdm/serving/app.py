@@ -17,7 +17,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from pdm.common.config import configure_mlflow_env, get_settings, load_yaml
 from pdm.common.logging import setup_logging
-from pdm.serving.inference import predict_row, validate_features
+from pdm.serving.inference import predict_details, validate_features
 from pdm.serving.inference_log import InferenceLog
 from pdm.serving.metrics import (
     MODEL_INFO,
@@ -92,7 +92,8 @@ def predict(req: PredictRequest, request: Request, response: Response) -> Predic
 
     start = time.perf_counter()
     try:
-        prediction = predict_row(loaded.model, req.features, required)
+        details = predict_details(loaded.model, req.features, required)
+        prediction = details["rul"]
     except Exception:
         REQUEST_COUNT.labels(status="error", shadow=shadow_label).inc()
         logger.exception("Prediction failed")
@@ -114,7 +115,12 @@ def predict(req: PredictRequest, request: Request, response: Response) -> Predic
         response.headers["X-Shadow"] = "true"
 
     return PredictResponse(
-        predicted_rul=prediction, model_name=loaded.name, model_version=loaded.version
+        predicted_rul=prediction,
+        model_name=loaded.name,
+        model_version=loaded.version,
+        rul_lower=details["rul_lower"],
+        rul_upper=details["rul_upper"],
+        maintenance_recommended=details["maintenance_recommended"],
     )
 
 

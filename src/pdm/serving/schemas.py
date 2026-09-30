@@ -17,6 +17,12 @@ class PredictResponse(BaseModel):
     predicted_rul: float
     model_name: str
     model_version: str
+    # Calibrated interval (about `coverage` of true RULs fall inside; see
+    # pdm.training.rul_model) and the model's maintenance rule applied to its lower
+    # bound. None when the served model has no interval / rule.
+    rul_lower: float | None = None
+    rul_upper: float | None = None
+    maintenance_recommended: bool | None = None
 
 
 class HealthResponse(BaseModel):

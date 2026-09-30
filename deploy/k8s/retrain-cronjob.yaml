@@ -17,7 +17,11 @@ spec:
           containers:
             - name: train
               image: ghcr.io/OWNER/pdm-train:latest
-              args: ["--raw-dir", "/data/raw", "--config-name", "training.yaml", "--fail-on-gate"]
+              # Train a candidate, then the champion/challenger gate decides whether it
+              # replaces Production (config/champion_challenger.yaml). A rejected
+              # candidate stays registered but is never promoted.
+              command: ["python", "-m", "pdm.training.retrain"]
+              args: ["--raw-dir", "/data/raw", "--config-name", "training.yaml"]
               env:
                 - name: MLFLOW_TRACKING_URI
                   value: "http://pdm-mlflow.pdm.svc.cluster.local:5000"

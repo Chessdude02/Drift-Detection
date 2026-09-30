@@ -5,6 +5,9 @@ dataset:
   raw_dir: data/raw
   processed_dir: data/processed
   rul_cap: 125                  # standard C-MAPSS RUL clipping ceiling
+  # Frozen holdout engines, never trained on; used only to judge models
+  # (pdm.evaluation.champion_challenger). See scripts/build_cmapss_holdout.py.
+  holdout_units_file: data/holdout/cmapss_FD001_holdout_v1.json
 
 features:
   rolling_windows: [5, 10, 20]  # cycles, for rolling mean/std features
@@ -32,11 +35,23 @@ model:
     max_depth: 6
     num_leaves: 31
     random_state: 42
+    verbose: -1
   val_split: 0.2
+  # Calibrated prediction interval served next to the point RUL (pdm.training.rul_model).
+  intervals:
+    enabled: true
+    coverage: 0.9               # target share of true RULs inside the interval
+
+# Maintenance rule tuned per model at training time (config/decision.yaml); the chosen
+# threshold ships inside the model and drives the maintenance_recommended output.
+decision_config: decision.yaml
 
 mlflow:
   experiment_name: cmapss_rul
   registered_model_name: cmapss_rul
 
 evaluation:
-  max_rmse: 35.0                # CI/model-validation gate threshold on holdout
+  # Sanity floor on internal validation RMSE only - it cannot tell a good model from a
+  # mediocre one. Promotion is decided by the champion/challenger gate
+  # (config/champion_challenger.yaml), not by this.
+  max_rmse: 35.0

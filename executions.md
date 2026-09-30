@@ -163,3 +163,22 @@ python -m pytest -q
   and an added case in `tests/unit/test_drift.py`.
 - One test fails before and after these changes (Linux path issue, `decisions.md` D10):
   `tests/unit/test_config.py::test_set_experiment_with_artifact_root_none_uses_mlflow_default`.
+
+## 10. Phase 2A: intervals, decision cost, champion/challenger gate
+
+```bash
+python scripts/build_cmapss_holdout.py --subset FD001 --n-units 20 --version v1
+MLFLOW_TRACKING_URI=sqlite:///mlflow.db python -m pdm.training.train --raw-dir data/raw
+python -m pdm.evaluation.champion_challenger --candidate-version 1 --promote --confirm-bootstrap
+python -m pdm.training.retrain --raw-dir data/raw        # train + gate in one step
+```
+
+| Model | Seed | NASA test RMSE | Interval coverage / width | Holdout cost per engine | Holdout failures | Threshold | Gate result |
+|---|---|---|---|---|---|---|---|
+| v1 | 42 | 22.7 | 91% / 65 | 12.68 | 0 | 9 | promoted (human-confirmed first promotion) |
+| v2 | 7 | 23.2 | 85% / 54 | 11.72 | 0 | 11 | promoted over v1 |
+| v3 | 42 | 22.7 | 91% / 65 | 12.68 | 0 | 9 | **rejected** vs v2 (cost 12.68 > limit 12.30) |
+
+- The first interval attempt used LightGBM quantile models. The upper bound came out as
+  exactly 125 on every row (D12), so the bounds were switched to scikit-learn.
+- Tests: 110 passed, plus the one failure that predates these changes.

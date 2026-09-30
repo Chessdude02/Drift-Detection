@@ -115,6 +115,33 @@ def promote_version(
     logger.info("Promoted %s v%s to Production", model_name, version)
 
 
+def promote_version_with_metrics(
+    client: MlflowClient,
+    model_name: str,
+    version: str,
+    metrics: dict[str, float],
+    holdout_version: str,
+) -> None:
+    """Like promote_version, for gates that re-score the champion every time
+    (pdm.evaluation.champion_challenger): the metrics are recorded as `gate_<name>` tags
+    for the audit trail only, never read back as a baseline. Moves the rollback marker
+    the same way, so scripts/rollback_production.py works unchanged.
+    """
+    old_prod = get_production_version(client, model_name)
+    _move_rollback_tag(client, model_name, from_version=old_prod, to_version=version)
+    client.transition_model_version_stage(
+        name=model_name, version=version, stage="Production", archive_existing_versions=True
+    )
+    for key, value in metrics.items():
+        client.set_model_version_tag(model_name, version, f"gate_{key}", str(value))
+    client.set_model_version_tag(model_name, version, "gate_holdout_version", holdout_version)
+    client.set_model_version_tag(
+        model_name, version, "promoted_at", dt.datetime.now(dt.timezone.utc).isoformat()
+    )
+    client.delete_model_version_tag(model_name, version, ROLLBACK_PRODUCTION_TAG)
+    logger.info("Promoted %s v%s to Production", model_name, version)
+
+
 def mark_not_operationally_ready(
     client: MlflowClient, model_name: str, version: str, note: str
 ) -> None:

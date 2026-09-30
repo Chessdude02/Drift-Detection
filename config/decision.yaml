@@ -1,0 +1,24 @@
+# Maintenance decision rule scored by pdm.evaluation.decision and tuned per model at
+# training time (the chosen threshold ships inside the model).
+#
+# The rule: schedule maintenance the first time the model's signal (lower bound of the
+# predicted-RUL interval, or the point prediction if intervals are off) drops to the
+# threshold. It takes lead_time_cycles to carry out.
+#
+# COSTS ARE PLACEHOLDERS. They only encode "an unplanned failure costs ~10x a planned
+# visit, and thrown-away life has a small cost per cycle". Replace them with real
+# numbers (parts, labour, downtime, safety/regulatory cost of a failure) before trusting
+# the threshold this picks: the chosen threshold moves a lot with the failure:planned
+# cost ratio.
+lead_time_cycles: 10
+
+costs:
+  unplanned_failure: 100.0
+  planned_maintenance: 10.0
+  per_wasted_cycle: 0.1
+
+# Candidate thresholds (in cycles of predicted RUL) searched at training time.
+threshold_grid:
+  start: 5
+  stop: 80
+  step: 1

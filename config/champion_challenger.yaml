@@ -1,0 +1,27 @@
+# C-MAPSS champion/challenger gate (pdm.evaluation.champion_challenger).
+#
+# Both the current Production model (champion) and the candidate (challenger) are
+# re-scored on the SAME frozen data every time - no stale baseline numbers:
+#   - holdout: the 20 frozen FD001 engines (dataset.holdout_units_file), run to failure,
+#     never trained on -> maintenance-decision cost and unplanned failures.
+#   - official NASA test set (last cycle per engine vs RUL_FD001.txt) -> RMSE and
+#     interval coverage.
+#
+# The challenger is promoted only if ALL hold:
+#   cost_per_engine     <= champion's * (1 + max_cost_increase)
+#   unplanned_failures  <= champion's + max_extra_failures
+#   test_rmse           <= champion's + max_rmse_increase
+#   test_rmse           <= max_test_rmse                 (absolute floor)
+#   interval_coverage   >= coverage_target - max_coverage_shortfall
+#
+# Non-inferiority, not "must beat": a retrain on newer data that is no worse is worth
+# promoting, and 20 holdout engines are too few to demand a measurable improvement.
+# The tolerances reflect that noise: one extra failure on 20 engines is 5 points.
+max_cost_increase: 0.05
+max_extra_failures: 0
+max_rmse_increase: 1.0
+# Current pipeline scores ~22-25 on the official FD001 test set; predict-the-mean
+# scores 42. 30 catches a broken model without failing on seed-to-seed noise.
+max_test_rmse: 30.0
+max_coverage_shortfall: 0.10
+holdout_version: cmapss_FD001_holdout_v1

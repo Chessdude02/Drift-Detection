@@ -13,6 +13,8 @@ WORKDIR /app
 COPY --from=builder /root/.local /home/appuser/.local
 COPY src/pdm ./pdm
 COPY config ./config
+# Frozen holdout engine list (config/training.yaml dataset.holdout_units_file).
+COPY data/holdout/*.json ./data/holdout/
 
 ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONPATH=/app \
