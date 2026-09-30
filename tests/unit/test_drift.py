@@ -53,3 +53,16 @@ def test_trigger_retrain_above_threshold_dry_run_does_not_call_k8s():
         dry_run=True,
     )
     assert triggered is True
+
+
+def test_compute_drift_score_uses_given_stattest_threshold(feature_frames):
+    features, columns = feature_frames
+    shifted = features.copy()
+    shifted[columns] = shifted[columns] + shifted[columns].std() * 0.5
+
+    default = compute_drift_score(features, shifted, columns, stattest="wasserstein")
+    lenient = compute_drift_score(
+        features, shifted, columns, stattest="wasserstein", stattest_threshold=100.0
+    )
+    assert default["share_of_drifted_columns"] > 0.0
+    assert lenient["share_of_drifted_columns"] == 0.0

@@ -25,12 +25,22 @@ logger = logging.getLogger(__name__)
 
 
 def compute_drift_score(
-    reference_df: pd.DataFrame, current_df: pd.DataFrame, columns: list[str]
+    reference_df: pd.DataFrame,
+    current_df: pd.DataFrame,
+    columns: list[str],
+    stattest: str | None = None,
+    stattest_threshold: float | None = None,
 ) -> dict:
+    """`stattest`/`stattest_threshold` are passed to Evidently's per-column drift test;
+    None keeps Evidently's defaults. config/drift.yaml sets calibrated values - see
+    scripts/calibrate_drift.py for why the defaults are unusable on C-MAPSS.
+    """
     ref = reference_df[columns]
     cur = current_df[columns]
 
-    report = Report(metrics=[DataDriftPreset()])
+    report = Report(
+        metrics=[DataDriftPreset(stattest=stattest, stattest_threshold=stattest_threshold)]
+    )
     report.run(reference_data=ref, current_data=cur)
     result = report.as_dict()
 
@@ -114,7 +124,13 @@ def main() -> int:
         logger.error("No overlapping drift columns between reference and current data")
         return 1
 
-    result = compute_drift_score(reference_df, current_df, columns)
+    result = compute_drift_score(
+        reference_df,
+        current_df,
+        columns,
+        stattest=config["drift"].get("stattest"),
+        stattest_threshold=config["drift"].get("stattest_threshold"),
+    )
     score = result["share_of_drifted_columns"]
     logger.info("Drift check result: %s", result)
 

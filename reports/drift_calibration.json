@@ -1,0 +1,67 @@
+{
+  "calibrated_threshold": 0.47,
+  "target_quantile": 0.99,
+  "drift_share_threshold": 0.5,
+  "window_rows": 500,
+  "false_alarm_rate_heldout_folds": {
+    "fleet_500_random_rows": {
+      "calibrated": 0.0,
+      "default_0.1": 0.2375
+    },
+    "small_fleet_5_engines": {
+      "calibrated": 0.045,
+      "default_0.1": 0.915
+    }
+  },
+  "detection_rate_heldout_folds": {
+    "fd003_new_fault_mode_fleet": {
+      "calibrated": 0.995,
+      "default_0.1": 1.0
+    },
+    "fd002_six_operating_conditions_fleet": {
+      "calibrated": 1.0,
+      "default_0.1": 1.0
+    },
+    "fd001_unseen_near_failure_rul_le_30": {
+      "calibrated": 1.0,
+      "default_0.1": 1.0
+    },
+    "offset_0.25std_all_14_columns": {
+      "calibrated": 0.0,
+      "default_0.1": 1.0
+    },
+    "offset_0.25std_3_of_14_columns": {
+      "calibrated": 0.0,
+      "default_0.1": 0.35
+    },
+    "offset_0.5std_all_14_columns": {
+      "calibrated": 0.89,
+      "default_0.1": 1.0
+    },
+    "offset_0.5std_3_of_14_columns": {
+      "calibrated": 0.0,
+      "default_0.1": 0.35
+    },
+    "offset_1.0std_all_14_columns": {
+      "calibrated": 1.0,
+      "default_0.1": 1.0
+    },
+    "offset_1.0std_3_of_14_columns": {
+      "calibrated": 0.0,
+      "default_0.1": 0.35
+    },
+    "offset_2.0std_all_14_columns": {
+      "calibrated": 1.0,
+      "default_0.1": 1.0
+    },
+    "offset_2.0std_3_of_14_columns": {
+      "calibrated": 0.0,
+      "default_0.1": 0.35
+    }
+  },
+  "evidently_crosscheck_fire_rate_fold3": {
+    "fd001_unseen_fleet": 0.0,
+    "fd002_fleet": 1.0,
+    "fd003_fleet": 1.0
+  }
+}

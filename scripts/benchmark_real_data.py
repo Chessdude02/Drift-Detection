@@ -152,22 +152,35 @@ def drift_windows(raw_dir: Path, config: dict, drift_cfg: dict) -> dict:
         "reference_rows": int(len(reference)),
         "scenarios": {},
     }
+    # "evidently_default" = Evidently's own per-column test; "configured" = the
+    # stattest/stattest_threshold in config/drift.yaml (see scripts/calibrate_drift.py).
+    settings = {
+        "evidently_default": {},
+        "configured": {
+            "stattest": drift_cfg["drift"].get("stattest"),
+            "stattest_threshold": drift_cfg["drift"].get("stattest_threshold"),
+        },
+    }
+    out["settings"] = settings
     for name, pool in scenarios.items():
-        scores = []
-        for t in range(DRIFT_TRIALS):
-            if callable(pool):
-                window = pool(t)
-            else:
-                window = pool.sample(n=min(n, len(pool)), random_state=t)
-            scores.append(compute_drift_score(reference, window, cols)["share_of_drifted_columns"])
-        scores = np.array(scores)
-        out["scenarios"][name] = {
-            "pool_rows": None if callable(pool) else int(len(pool)),
-            "mean_drift_share": float(scores.mean()),
-            "min": float(scores.min()),
-            "max": float(scores.max()),
-            "retrain_trigger_rate": float((scores > threshold).mean()),
-        }
+        out["scenarios"][name] = {"pool_rows": None if callable(pool) else int(len(pool))}
+        for label, kwargs in settings.items():
+            scores = []
+            for t in range(DRIFT_TRIALS):
+                if callable(pool):
+                    window = pool(t)
+                else:
+                    window = pool.sample(n=min(n, len(pool)), random_state=t)
+                scores.append(
+                    compute_drift_score(reference, window, cols, **kwargs)[
+                        "share_of_drifted_columns"
+                    ]
+                )
+            scores = np.array(scores)
+            out["scenarios"][name][label] = {
+                "mean_drift_share": float(scores.mean()),
+                "retrain_trigger_rate": float((scores > threshold).mean()),
+            }
     return out
 
 
@@ -198,8 +211,11 @@ def main() -> int:
     result["drift"] = drift_windows(raw_dir, config, drift_cfg)
     for name, s in result["drift"]["scenarios"].items():
         print(
-            f"drift {name}: mean_share={s['mean_drift_share']:.2f} "
-            f"trigger_rate={s['retrain_trigger_rate']:.2f}"
+            f"drift {name}: "
+            f"default trigger={s['evidently_default']['retrain_trigger_rate']:.2f} "
+            f"(share {s['evidently_default']['mean_drift_share']:.2f})  "
+            f"configured trigger={s['configured']['retrain_trigger_rate']:.2f} "
+            f"(share {s['configured']['mean_drift_share']:.2f})"
         )
 
     out = Path(args.out)

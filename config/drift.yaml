@@ -9,6 +9,13 @@ current_window:
 
 drift:
   threshold: 0.5                 # share of drifted columns (Evidently DataDriftPreset) that triggers retrain
+  # Per-column test. Evidently's default (normed Wasserstein, 0.1) flags 90%+ of windows
+  # of unseen but normal FD001 engines, because engine-to-engine variation alone exceeds
+  # 0.1. 0.47 is the 99th percentile of normal windows on real FD001 data; re-run
+  # scripts/calibrate_drift.py (results: reports/drift_calibration.json) if the
+  # features, window size or reference data change.
+  stattest: wasserstein
+  stattest_threshold: 0.47
   columns:
     - sensor_2_roll_mean_20
     - sensor_3_roll_mean_20
