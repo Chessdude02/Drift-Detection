@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 import sys
+import tempfile
 from pathlib import Path
 
 import mlflow
@@ -20,6 +21,8 @@ import mlflow
 from pdm.common.config import configure_mlflow_env, load_yaml, set_experiment_with_artifact_root
 from pdm.common.logging import setup_logging
 from pdm.data.datasets import get_adapter
+from pdm.drift.life_stage import add_oof_predictions
+from pdm.drift.reference import DRIFT_REFERENCE_ARTIFACT_DIR, DRIFT_REFERENCE_FILE
 from pdm.evaluation.decision import choose_threshold, threshold_grid
 from pdm.training.evaluate import passes_validation_gate, rmse
 from pdm.training.rul_model import RULIntervalModel, RULPyfunc
@@ -209,6 +212,16 @@ def _run_bundle_training(feature_df, cols, config, adapter, register, extra_tags
             registered_model_name=mlflow_cfg["registered_model_name"] if register else None,
         )
         model_version = getattr(model_info, "registered_model_version", None)
+
+        if config.get("drift_reference", {}).get("enabled"):
+            # The drift job compares live traffic with THIS model's training data, so the
+            # reference ships with the model instead of being seeded by hand
+            # (pdm.drift.reference.load_reference).
+            reference = add_oof_predictions(feature_df, cols, model_cfg)
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / DRIFT_REFERENCE_FILE
+                reference.to_parquet(path, index=False)
+                mlflow.log_artifact(str(path), artifact_path=DRIFT_REFERENCE_ARTIFACT_DIR)
 
         gate_passed = passes_validation_gate(metrics["val_rmse"], eval_cfg["max_rmse"])
         mlflow.log_metric("gate_passed", int(gate_passed))

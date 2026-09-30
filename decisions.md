@@ -226,10 +226,8 @@ a human to confirm. Not done here, to keep this change focused. It's a small cha
 
 **Status:** Open
 
-- **The drift job has no reference file inside the cluster.** `docker/drift.Dockerfile`
-  doesn't copy `data/processed/reference.parquet`, and
-  `deploy/k8s/drift-check-cronjob.yaml` doesn't mount it. The job would fail at its
-  first step in the cluster. Needs a volume or a build step.
+- ~~**The drift job has no reference file inside the cluster.**~~ Resolved by D17: the
+  job now downloads the Production model's reference from MLflow.
 - **The model-quality gate is too loose.** `max_rmse: 35` against a real test RMSE of
   22.3 (D1).
 - **The model is mediocre.** 22.3 RMSE on FD001 against published results of roughly
@@ -371,3 +369,38 @@ real regressions.
 
 **Cost.** A held retrain waits for a person. That's intended: an automatic retrain on
 possibly bad data is the riskier default.
+
+## D17. The drift reference ships with the model, not as a hand-seeded file
+
+**Status:** Accepted
+
+**Problem.**
+- The drift job read `data/processed/reference.parquet`, seeded by hand. Nothing kept
+  that file in step with the model in Production.
+- Inside the cluster the file didn't exist at all (D10).
+
+**Decision.**
+- Every training run logs its own reference (training features plus out-of-fold
+  predicted remaining life) as an MLflow artifact next to the model.
+- The drift job loads the reference of whichever version is in Production
+  (`reference.source: model`, `src/pdm/drift/reference.py`). The job already had
+  `MLFLOW_TRACKING_URI`, so nothing needs mounting.
+- If the artifact is missing, the job fails loudly instead of falling back to the
+  file. Comparing traffic against another model's training data is the mismatch this
+  change removes. `source: file` still works for local runs.
+
+**Checked.** Train, then promote, then 500 real rows from 20 unseen holdout engines,
+then the real drift job. Result: it loaded "cmapss_rul v1", saw 20 engines, drift 0.0,
+action `none`. Peak memory was 377 MiB against the job's 512 MiB limit, so the limit
+was raised to 768 MiB.
+
+**Cost.** Training takes a few seconds longer: 5 extra model fits to build the
+out-of-fold predictions.
+
+## D18. A runbook entry for every alert
+
+**Status:** Accepted
+
+`RUNBOOK.md` now has an "Alerts" section: for each of the 7 alerts, what it means and
+what to do, plus how to read a gate decision. Alerts nobody knows how to act on get
+ignored.

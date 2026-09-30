@@ -28,6 +28,7 @@ from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 from pdm.common.config import get_settings, load_yaml
 from pdm.common.logging import setup_logging
 from pdm.drift.life_stage import REFERENCE_PREDICTION_COLUMN, match_life_stage
+from pdm.drift.reference import load_reference
 from pdm.drift.sensor_check import faulty_sensors, sensor_fault_scores
 from pdm.serving.inference_log import InferenceLog
 
@@ -304,7 +305,12 @@ def main() -> int:
     config = load_yaml(args.config_name)
     settings = get_settings()
 
-    reference_df = pd.read_parquet(config["reference"]["path"])
+    try:
+        reference_df, reference_source = load_reference(config["reference"])
+    except (RuntimeError, ValueError, OSError):
+        logger.exception("Could not load the drift reference")
+        return 1
+    logger.info("Drift reference: %s (%d rows)", reference_source, len(reference_df))
     if len(reference_df) < config["reference"]["min_reference_rows"]:
         logger.error(
             "Reference dataset too small (%d rows); aborting drift check", len(reference_df)

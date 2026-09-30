@@ -1,7 +1,8 @@
 # Runbook
 
-Stub — to be completed in Phase 6. Operational procedures for the predictive-maintenance
-CI/CD pipeline (training, staged promotion, rollback, drift response) will live here.
+Operational procedures for the predictive-maintenance
+CI/CD pipeline: training, staged promotion, rollback, drift response, and what to do for
+each alert (see "Alerts" at the end).
 
 ## Training data
 
@@ -272,3 +273,107 @@ its K8s steps, so it did not need the same restructuring. Closing this gap for r
 requires either a real cluster + `KUBE_CONFIG`, or accepting (and explicitly deciding,
 not silently allowing) that promotions exercise only the MLflow registry state change
 until one exists.
+
+## Alerts: what each one means and what to do
+
+Every alert in `monitoring/prometheus/alerts.yaml` has an entry here. Shared first
+steps:
+- `kubectl get cronjobs,jobs -n pdm`
+- the drift job's logs: `kubectl logs -n pdm job/<latest pdm-drift-check job>`
+- the Production model: `MlflowClient().get_latest_versions("cmapss_rul", ["Production"])`
+
+### DriftScoreHigh
+
+**Meaning.** More than half the sensor columns differ from the Production model's
+training data at the same life stage. The inputs have really changed: new operating
+conditions, a new fault mode, a fleet change.
+
+**Do.**
+1. Check whether `RetrainHeldForSensorFault` is also firing. If it is, handle that first.
+2. Otherwise a retrain Job was already created. Watch it: `kubectl logs -n pdm job/pdm-retrain-drift-...`.
+3. Read the gate's decision in the job log ("Gate APPROVED/REJECTED ... reasons").
+   - A rejection is normal and safe: Production is unchanged.
+   - If it's rejected repeatedly while drift stays high, the model can't adapt with the
+     data it has. Escalate: new labelled data or a model change is needed (see
+     `decisions.md` D14 on gate noise).
+
+### SensorFaultSuspected
+
+**Meaning.** One sensor no longer tracks the others the way it did in training. The
+`sensor` label names it; if several fire, the highest `pdm_sensor_fault_score` is the
+likely culprit. Measured on FD001: catches a 0.5 std offset or a stuck sensor 100% of
+the time; false alarms 0-3% on normal fleets.
+
+**Do.**
+1. Have maintenance check that sensor: calibration, wiring, a stuck value.
+2. Don't retrain because of this alert. The model is fine; the input is wrong.
+3. While it's firing, treat predictions from the affected engines with suspicion.
+
+### RetrainHeldForSensorFault
+
+**Meaning.** The drift check wanted to retrain, but a sensor also looks broken, so no
+retrain Job was created (`sensor_check.hold_retrain_on_fault`).
+
+**Do.**
+1. Handle `SensorFaultSuspected` first.
+2. If the sensor turns out to be fine and the drift is real, start the retrain by hand:
+   `kubectl create job -n pdm --from=cronjob/pdm-retrain pdm-retrain-manual-$(date +%s)`.
+3. If the sensor was broken, fix it and let the next checks run. Drift should go away.
+
+### DriftCheckSkipped
+
+**Meaning.** No drift decision for 6 hours.
+- `skip_no_data`: no traffic.
+- `skip_too_few_engines`: fewer than `current_window.min_engines` engines in the window
+  (`pdm_drift_window_engines`). With fewer than 5 engines the checks are wrong 15-94%
+  of the time (`decisions.md` D8).
+
+**Do.**
+1. Confirm traffic: `pdm_predictions_total` rate.
+2. Confirm clients send `asset_id`: a spike in
+   `pdm_input_rejected_total{reason="missing_asset_id"}` means they don't.
+3. If the fleet is genuinely small, widen `current_window.lookback_hours` so a window
+   covers 5+ engines. Don't lower `min_engines`.
+
+### ServingErrorRateSpike
+
+**Meaning.** More than 5% of live requests failed.
+
+**Do.**
+1. Look at `pdm_input_rejected_total` by `reason`.
+   - `missing_asset_id`, `missing_features` or `non_finite` means a client or upstream
+     data problem. The model is fine.
+   - Otherwise check the serving pod logs for "Prediction failed".
+2. If a canary is rolling out, Argo should roll it back. Otherwise
+   `./scripts/rollback.ps1 undo`, then roll the model back (see Rollback).
+
+### ServingHighLatencyP95
+
+**Meaning.** p95 latency is over 1 second.
+
+**Do.** Check pod CPU and memory, then check whether the model changed: the interval
+model runs three models per request.
+
+### NoModelLoaded
+
+**Meaning.** No serving pod has a Production model, so all traffic is failing.
+
+**Do.**
+1. Check that the MLflow server is reachable from the pods.
+2. Check that a Production version exists.
+3. If the latest promotion is broken, roll back (`scripts/rollback_production.py`).
+
+## Champion/challenger gate: reading a decision
+
+`python -m pdm.training.retrain` (and the pdm-retrain CronJob) logs one line per check,
+for example `cost_per_engine: challenger 12.675 vs champion 11.715 (limit 12.301) -> FAIL`.
+
+- **Every check PASS:** the candidate was promoted. Its scores are on the version as
+  `gate_*` tags.
+- **Any check FAIL:** Production is unchanged. The candidate stays registered for
+  inspection.
+- **First promotion ever:** always rejected until a human reviews the scores and runs
+  `python -m pdm.evaluation.champion_challenger --candidate-version N --promote --confirm-bootstrap`.
+- **Known noise:** changing only the random seed moves holdout cost by about 8%, more
+  than the 5% tolerance (`decisions.md` D14). One rejection on cost alone is not
+  evidence the candidate is worse.

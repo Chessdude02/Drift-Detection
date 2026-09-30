@@ -1,5 +1,9 @@
 # Drift-check job configuration.
 reference:
+  # model: the reference logged with the current Production model (pdm.drift.reference);
+  # file: `path`, seeded by scripts/seed_reference_data.py (local runs, older models).
+  source: model
+  model_name: cmapss_rul
   path: data/processed/reference.parquet
   min_reference_rows: 200
 

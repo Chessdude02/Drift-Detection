@@ -196,3 +196,15 @@ and D8. Checked by tests:
 - `tests/unit/test_drift_actions.py`: skip under 5 engines, hold on sensor fault,
   sensor alert alone never retrains, shadow rows dropped, time window.
 - Suite: 128 passed, plus the one failure that predates these changes.
+
+## 12. Phase 2C: reference ships with the model; runbook
+
+```bash
+python -m pdm.training.train --raw-dir data/raw          # also logs drift_reference/reference.parquet
+python -m pdm.evaluation.champion_challenger --candidate-version 1 --promote --confirm-bootstrap
+# 500 rows from the 20 holdout engines written to the inference log, then:
+INFERENCE_LOG_DB=... python -m pdm.drift.run_drift_check --dry-run
+```
+
+Output: `Drift reference: cmapss_rul v1 (run ...) (16679 rows)`, then
+`action=none engines=20 share_of_drifted_columns=0.0`. Peak memory 377 MiB.

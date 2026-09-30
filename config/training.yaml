@@ -46,6 +46,11 @@ model:
 # threshold ships inside the model and drives the maintenance_recommended output.
 decision_config: decision.yaml
 
+# Log this model's drift reference (training features + out-of-fold predicted RUL)
+# next to the model; the drift job loads the Production model's reference from MLflow.
+drift_reference:
+  enabled: true
+
 mlflow:
   experiment_name: cmapss_rul
   registered_model_name: cmapss_rul
