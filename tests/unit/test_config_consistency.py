@@ -4,8 +4,12 @@ A mismatch here is silent until runtime: MLflow's schema enforcement rejects eve
 /predict call, and the drift check finds no overlapping columns.
 """
 
+import pytest
+
 from pdm.common.config import load_yaml
 from pdm.data.features import feature_columns
+
+pytestmark = pytest.mark.unit
 
 
 def _training_columns() -> list[str]:

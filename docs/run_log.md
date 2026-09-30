@@ -296,3 +296,13 @@ tuned_c in pass 2.
 Adopted: `calibration: cross_validation` (D-26). A real training run then took 30 s:
 test RMSE 21.40, coverage 87%, holdout cost 12.21, 0 failures, threshold 12. Suite: 144
 passed, plus the one failure that predates these changes.
+
+## 16. PR #2 CI fix
+
+```bash
+pytest -q tests/unit/test_config.py::test_set_experiment_with_artifact_root_none_uses_mlflow_default  # 1 failed (before)
+ruff check src tests && black --check src tests                                                     # clean
+pytest -q -m unit          # 129 passed
+pytest -q -m integration   # 16 passed
+pytest -q -m "not unit and not integration" --collect-only   # 0 tests (every test now runs in CI)
+```

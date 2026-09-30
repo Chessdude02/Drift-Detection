@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import mlflow
 import pytest
 from mlflow import MlflowClient
@@ -114,6 +116,6 @@ def test_set_experiment_with_artifact_root_none_uses_mlflow_default(
     client = MlflowClient()
     exp = client.get_experiment_by_name("plain_experiment")
     assert exp is not None
-    assert exp.artifact_location.startswith("file://") or exp.artifact_location.startswith(
-        "mlflow-artifacts:"
-    )
+    location = exp.artifact_location
+    # MLflow's default is a URI on some platforms and a plain absolute path on Linux.
+    assert location.startswith(("file://", "mlflow-artifacts:")) or Path(location).is_absolute()

@@ -49,6 +49,7 @@ code states a reason, it's in the relevant module's docstring.
 | D-26 | Cross-validated calibration of interval and threshold | Accepted | 2026-09-30 |
 | D-27 | Trend features (5- minus 20-cycle mean) | Proposed | 2026-09-30 |
 | D-28 | Hyperparameter tuning and seed averaging | Rejected | 2026-09-30 |
+| D-29 | Fix the pre-existing Linux-only test failure in this PR | Accepted | 2026-09-30 |
 
 ---
 
@@ -319,7 +320,7 @@ code states a reason, it's in the relevant module's docstring.
   - The model is mediocre (22.3 against published 12–18): **open**, planned model
     work.
   - `tests/unit/test_config.py::test_set_experiment_with_artifact_root_none_uses_mlflow_default`
-    fails on Linux before and after every change here: **open**. It's likely a
+    fails on Linux before and after every change here: **fixed by D-29**. It was a
     Windows/Linux path difference.
   - Drift numbers are for FD001 only, and "0%" means "probably under ~2.5%" with 120
     windows: **open, by nature**.
@@ -896,3 +897,37 @@ code states a reason, it's in the relevant module's docstring.
 - **Actual effect:** n/a (not adopted).
 - **Evidence:** `reports/model_quality.json`, `reports/model_quality_cv.json`.
 - **Related:** D-14, D-26.
+
+## D-29: Fix the pre-existing Linux-only test failure in this PR
+- **Date:** 2026-09-30
+- **Status:** Accepted
+- **Context:**
+  - PR #2's CI failed only on
+    `tests/unit/test_config.py::test_set_experiment_with_artifact_root_none_uses_mlflow_default`,
+    which failed before this work too.
+  - It expected MLflow's default artifact location to start with `file://`. On Linux
+    MLflow 2.x returns a plain absolute path.
+  - Because the unit step failed first, **CI never ran the integration tests**.
+- **Options considered:**
+  1. Leave it and explain on the PR.
+     *Pro:* keeps the PR scoped. *Con:* CI stays red, and the integration tests (the
+     end-to-end loop included) never run in CI.
+  2. Fix the assertion to also accept an absolute path, in this PR.
+     *Pro:* one test-only change; keeps the test's intent ("MLflow's own default").
+     *Con:* touches a file outside the PR's scope.
+  3. Skip or mark the test as expected to fail.
+     *Pro:* quick. *Con:* hides a check.
+- **Decision:** Option 2. Option 1 was proposed on the PR first; the user approved
+  including the fix.
+- **Factors that led to it:** Unblocks CI; option 3 would hide a check.
+- **Trade-offs accepted:** A slightly wider PR.
+- **Expected effect:** CI green; integration tests run in CI for the first time.
+- **Actual effect:**
+  - Locally: the test failed before the fix and passes after.
+  - Running CI's own steps locally: `ruff` and `black --check` clean, 129 unit and 16
+    integration tests pass.
+  - **Also found while checking:** `tests/unit/test_config_consistency.py` (added in
+    D-2) had no `unit`/`integration` marker, so CI never ran it. It's marked now, and
+    no test is left unmarked. CI result on the push: Not yet measured.
+- **Evidence:** PR #2 comment 5921043519; `tests/unit/test_config.py`.
+- **Related:** D-2, D-10.
