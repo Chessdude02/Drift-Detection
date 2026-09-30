@@ -31,6 +31,10 @@ _bearing_load
     [U] build_bearing_feature_matrix
     [U] cap_rul
     [U] feature_columns
+_choose_maintenance_threshold
+    [U] choose_threshold
+    [U] load_yaml
+    [U] threshold_grid
 _cmapss_features
     [U] build_feature_matrix
     [U] cap_rul
@@ -39,6 +43,17 @@ _cmapss_features
 _cmapss_load
     [U] _cmapss_features
     [U] load_holdout_units
+_fit_bundle_cv
+    [U] _choose_maintenance_threshold
+    [U] _fit_point
+    [U] _make_regressor
+    [U] _set_feature_ranges
+    [U] fit
+    [U] rmse
+_fit_point
+    [U] SeedEnsemble
+    [U] __init__
+    [U] _make_regressor
 _get_loaded_model
     [U] ModelLoader
 _init_db
@@ -117,13 +132,14 @@ feature_columns
     [U] CHANNEL_STATS
     [U] OP_SETTING_COLUMNS
 fit
+    [U] _fit_point
     [U] _make_regressor
 fit_bundle
-    [U] choose_threshold
+    [U] _choose_maintenance_threshold
+    [U] _fit_bundle_cv
+    [U] _set_feature_ranges
     [U] fit
-    [U] load_yaml
     [U] rmse
-    [U] threshold_grid
 get_adapter
     [U] _ADAPTERS
 get_baseline_scores
@@ -219,6 +235,7 @@ predict
     [U] PredictResponse
     [U] REQUEST_COUNT
     [U] REQUEST_LATENCY
+    [U] __init__
     [U] _get_loaded_model
     [U] feature_stats
     [U] non_finite_features

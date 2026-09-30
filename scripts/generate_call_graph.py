@@ -40,7 +40,9 @@ GRAPHS = {
     "drift": ["--function", "pdm.drift.run_drift_check.main", "--direction", "down"],
     "serving": ["--function", "pdm.serving.app.predict", "--direction", "down"],
 }
-COMMON = ["--uses", "--no-defines", "--colored", "--grouped"]
+# --nested-groups, not --grouped: with --grouped, Graphviz 2.43 fails on the full
+# package graph ("trouble in init_rank"); nested module groups render fine.
+COMMON = ["--uses", "--no-defines", "--colored", "--nested-groups"]
 
 
 def pyan(args: list[str], fmt: str) -> str:
@@ -73,6 +75,7 @@ def main() -> int:
                 str(OUT / f"{name}.svg"),
             ],
             check=True,
+            capture_output=True,
         )
         print(f"wrote docs/call_graph/{name}.dot/.svg/.txt")
     return 0

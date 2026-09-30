@@ -35,7 +35,7 @@ rollback).
 
 | Entry point | Command | What it does |
 |---|---|---|
-| Serving API | `uvicorn pdm.serving.app:app --port 8000` | `POST /predict`, `GET /healthz`, `/readyz`, `/metrics`. Loads the Production model from MLflow and re-checks every 300 s. |
+| Serving API | `OMP_NUM_THREADS=1 uvicorn pdm.serving.app:app --port 8000` | `POST /predict`, `GET /healthz`, `/readyz`, `/metrics`. Loads the Production model from MLflow and re-checks every 300 s. |
 | Retrain job (weekly + drift-triggered) | `python -m pdm.training.retrain --raw-dir /data/raw` | Rebuilds outcome labels, trains a candidate, runs the champion/challenger gate, promotes if approved. K8s: `deploy/k8s/retrain-cronjob.yaml`. |
 | Drift check (every 30 min) | `python -m pdm.drift.run_drift_check [--dry-run]` | Reads the last 24 h of predictions, runs the drift and sensor checks, pushes metrics, may start a retrain Job. K8s: `deploy/k8s/drift-check-cronjob.yaml`. |
 
@@ -60,6 +60,7 @@ rollback).
 | `seed_reference_data.py` | Writes a drift reference to `data/processed/reference.parquet` (only for `reference.source: file`). |
 | `generate_call_graph.py` | Regenerates `docs/call_graph/` (section 5). |
 | `experiments/compare_drift_methods.py` | The experiment behind D-4/D-5. ~25 min. |
+| `experiments/model_quality.py [--variants ...] [--out ...]` | Model variants × 5 seeds, scored like the gate → `reports/model_quality*.json` (D-26–D-28). ~15–25 min. |
 | `promote_to_production.py`, `score_on_holdout.py`, `build_holdout.py`, `promote_model.py`, `rollback_production.py`, `mlflow_gcs_sync.py`, `rollback.ps1`, `setup_kind.ps1` | The IMS-bearing promotion flow, rollback, MLflow sync and cluster setup that predate this work; see `RUNBOOK.md`. `rollback_production.py` also works for `cmapss_rul`. |
 
 ### Tests
@@ -186,12 +187,16 @@ This is the main entry point: it exercises labels, training and the gate.
         (`load_label_dataset`), returns `(rows, manifest)`.
       - `base_data_manifest(...)` → raw-file sha256, holdout file, row counts.
       - `_run_bundle_training(...)`:
-        - `fit_bundle(feature_df, cols, config, _cmapss_split)` → splits engines 80/20
-          (`GroupShuffleSplit`), `RULIntervalModel.fit(...)` (LightGBM point model +
-          two scikit-learn quantile models + conformal correction from the validation
-          engines), stores training feature ranges, then `choose_threshold(...)`
-          (`simulate_policy` over a grid) on validation engines with known failure
-          cycles. Returns `{"bundle", "train_df", "val_df", "metrics"}`.
+        - `fit_bundle(feature_df, cols, config, _cmapss_split)` → with
+          `calibration: cross_validation` (the default) calls `_fit_bundle_cv`: splits
+          engines into 5 folds, predicts each fold with models fitted on the others
+          (point + two scikit-learn quantile models), sets the conformal correction
+          from all out-of-fold predictions, fits the final models on all engines
+          (`RULIntervalModel.fit`), stores feature ranges (`_set_feature_ranges`) and
+          picks the threshold on out-of-fold lower bounds
+          (`_choose_maintenance_threshold` → `choose_threshold` → `simulate_policy`).
+          With `calibration: split` it uses one 80/20 engine split instead. Returns
+          `{"bundle", "train_df", "val_df", "metrics"}`.
         - Logs params/metrics/`data_manifest.json`, logs the model with
           `mlflow.pyfunc.log_model(python_model=RULPyfunc(bundle))` and registers a
           version.
@@ -247,9 +252,10 @@ pdm.training.retrain.main()
      │   ├─ base_data_manifest()
      │   └─ _run_bundle_training()
      │       ├─ fit_bundle()
-     │       │   ├─ RULIntervalModel.fit() ── _make_regressor()
-     │       │   ├─ RULIntervalModel.predict_frame()
-     │       │   └─ choose_threshold() ── simulate_policy()
+     │       │   └─ _fit_bundle_cv()               (calibration: cross_validation)
+     │       │       ├─ RULIntervalModel.fit() ×6 ── _fit_point(), _make_regressor()
+     │       │       ├─ _set_feature_ranges()
+     │       │       └─ _choose_maintenance_threshold() ── choose_threshold() ── simulate_policy()
      │       ├─ mlflow.pyfunc.log_model(RULPyfunc)
      │       └─ add_oof_predictions() ── _fit_model()
      └─ run_gate()
@@ -291,7 +297,8 @@ pdm.serving.app.lifespan()           (startup)
 | Function | File | What it does | Inputs → outputs | Side effects | Called by |
 |---|---|---|---|---|---|
 | `run_training` | `src/pdm/training/train.py` | Loads data, adds labels, fits, logs, registers | raw_dir, config → result dict | MLflow run, model version, artifacts | `retrain`, `train.main`, tests |
-| `fit_bundle` | `src/pdm/training/train.py` | Split, fit bundle, calibrate interval, choose threshold | feature_df, cols, config, split_fn → dict(bundle, train_df, val_df, metrics) | none | `_run_bundle_training`, tests |
+| `fit_bundle` | `src/pdm/training/train.py` | Fit bundle, calibrate interval, choose threshold (dispatches to `_fit_bundle_cv` or the split path) | feature_df, cols, config, split_fn → dict(bundle, train_df, val_df, metrics) | none | `_run_bundle_training`, experiments, tests |
+| `_fit_bundle_cv` | `src/pdm/training/train.py` | 5-fold out-of-fold calibration, final models on all engines (D-26) | feature_df, cols, config → same dict | none | `fit_bundle` |
 | `RULIntervalModel.fit` / `.predict_frame` | `src/pdm/training/rul_model.py` | Point + quantile models + conformal correction; returns rul, rul_lower, rul_upper, maintenance_recommended | X/y → model; X → DataFrame | none | `fit_bundle`, `RULPyfunc.predict` |
 | `retrain` | `src/pdm/training/retrain.py` | Labels → train → gate | raw_dir, config → dict(labels, training, gate) | writes labels, MLflow, may promote | `retrain.main`, `label_loop_demo.py`, tests |
 | `run_gate` | `src/pdm/evaluation/champion_challenger.py` | Scores candidate and champion, decides, promotes | version, raw_dir, config → report dict | may change Production stage | `retrain`, `champion_challenger.main` |
@@ -371,7 +378,9 @@ pdm.serving.app.lifespan()           (startup)
 | | `features.rolling_windows` | [5, 10, 20] | Largest one (20) is the feature window |
 | | `features.sensor_columns` | 14 sensors | Model inputs |
 | | `model.algorithm` / `params` | lightgbm, 300 trees, lr 0.05, depth 6 | Point model |
-| | `model.val_split` | 0.2 | Share of engines for validation/calibration |
+| | `model.calibration` / `cv_folds` | cross_validation / 5 | How interval and threshold are calibrated (D-26); `split` = one 80/20 split |
+| | `model.val_split` | 0.2 | Share of engines for validation (split calibration only) |
+| | `model.ensemble_seeds` | unset | Average one point model per seed (no effect with current settings, D-28) |
 | | `model.intervals.enabled` / `coverage` | true / 0.9 | Prediction interval (D-12) |
 | | `decision_config` | decision.yaml | Enables maintenance threshold choice (D-13) |
 | | `drift_reference.enabled` | true | Log drift reference with the model (D-17) |
@@ -409,6 +418,7 @@ pdm.serving.app.lifespan()           (startup)
 | `OUTCOME_DB` | ./data/outcomes/outcomes.db | outcomes CLI, label build |
 | `LABELS_DIR` | ./data/labels | label build, training |
 | `PROMETHEUS_PUSHGATEWAY_URL` | http://localhost:9091 | drift job |
+| `OMP_NUM_THREADS` | unset (1 in the serving image) | threads per LightGBM/scikit-learn call; 1 keeps `/predict` at ~30 ms under CPU load instead of 0.6-1.4 s (D-25) |
 | `MODEL_NAME`, `MODEL_STAGE`, `DATA_DIR`, `SERVING_PORT`, `MODEL_REFRESH_SECONDS`, `DRIFT_THRESHOLD`, `DRIFT_REFERENCE_PATH`, `KUBE_NAMESPACE`, `RETRAIN_CRONJOB_NAME` | see config.py | **Defined but not read** by current code — the YAML files above are what count |
 
 ### Command-line flags

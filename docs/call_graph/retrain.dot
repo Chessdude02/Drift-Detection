@@ -94,15 +94,15 @@ digraph G {
             "pdm__labels__outcomes__EVENT_TYPES" [label="EVENT_TYPES", style="filled", fillcolor="#65adffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.EVENT_TYPES\nsrc/pdm/labels/outcomes.py:28\nname in pdm.labels.outcomes"];
             "pdm__labels__outcomes__OutcomeStore" [label="OutcomeStore", style="filled", fillcolor="#65adffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore\nsrc/pdm/labels/outcomes.py:45\nclass in pdm.labels.outcomes"];
             "pdm__labels__outcomes___SCHEMA" [label="_SCHEMA", style="filled", fillcolor="#65adffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes._SCHEMA\nsrc/pdm/labels/outcomes.py:30\nname in pdm.labels.outcomes"];
-        }
-        subgraph "cluster_pdm__labels__outcomes__OutcomeStore" {
+            subgraph "cluster_pdm__labels__outcomes__OutcomeStore" {
 
-            graph [style="filled,rounded", fillcolor="#80808018", label="pdm.labels.outcomes.OutcomeStore"];
-            "pdm__labels__outcomes__OutcomeStore____init__" [label="__init__", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore.__init__\nsrc/pdm/labels/outcomes.py:46\nmethod in pdm.labels.outcomes.OutcomeStore"];
-            "pdm__labels__outcomes__OutcomeStore___connect" [label="_connect", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore._connect\nsrc/pdm/labels/outcomes.py:52\nmethod in pdm.labels.outcomes.OutcomeStore"];
-            "pdm__labels__outcomes__OutcomeStore__add" [label="add", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore.add\nsrc/pdm/labels/outcomes.py:55\nmethod in pdm.labels.outcomes.OutcomeStore"];
-            "pdm__labels__outcomes__OutcomeStore__events" [label="events", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore.events\nsrc/pdm/labels/outcomes.py:102\nmethod in pdm.labels.outcomes.OutcomeStore"];
-            "pdm__labels__outcomes__OutcomeStore__import_csv" [label="import_csv", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore.import_csv\nsrc/pdm/labels/outcomes.py:79\nmethod in pdm.labels.outcomes.OutcomeStore"];
+                graph [style="filled,rounded", fillcolor="#80808018", label="pdm.labels.outcomes.OutcomeStore"];
+                "pdm__labels__outcomes__OutcomeStore____init__" [label="__init__", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore.__init__\nsrc/pdm/labels/outcomes.py:46\nmethod in pdm.labels.outcomes.OutcomeStore"];
+                "pdm__labels__outcomes__OutcomeStore___connect" [label="_connect", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore._connect\nsrc/pdm/labels/outcomes.py:52\nmethod in pdm.labels.outcomes.OutcomeStore"];
+                "pdm__labels__outcomes__OutcomeStore__add" [label="add", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore.add\nsrc/pdm/labels/outcomes.py:55\nmethod in pdm.labels.outcomes.OutcomeStore"];
+                "pdm__labels__outcomes__OutcomeStore__events" [label="events", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore.events\nsrc/pdm/labels/outcomes.py:102\nmethod in pdm.labels.outcomes.OutcomeStore"];
+                "pdm__labels__outcomes__OutcomeStore__import_csv" [label="import_csv", style="filled", fillcolor="#3292ffb2", fontcolor="#000000", group="10", tooltip="pdm.labels.outcomes.OutcomeStore.import_csv\nsrc/pdm/labels/outcomes.py:79\nmethod in pdm.labels.outcomes.OutcomeStore"];
+            }
         }
         subgraph "cluster_pdm__serving__inference_log" {
 
@@ -110,18 +110,18 @@ digraph G {
             "pdm__serving__inference_log__InferenceLog" [label="InferenceLog", style="filled", fillcolor="#6577ffb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog\nsrc/pdm/serving/inference_log.py:33\nclass in pdm.serving.inference_log"];
             "pdm__serving__inference_log___ADDED_COLUMNS" [label="_ADDED_COLUMNS", style="filled", fillcolor="#6577ffb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log._ADDED_COLUMNS\nsrc/pdm/serving/inference_log.py:24\nname in pdm.serving.inference_log"];
             "pdm__serving__inference_log___SCHEMA" [label="_SCHEMA", style="filled", fillcolor="#6577ffb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log._SCHEMA\nsrc/pdm/serving/inference_log.py:12\nname in pdm.serving.inference_log"];
-        }
-        subgraph "cluster_pdm__serving__inference_log__InferenceLog" {
+            subgraph "cluster_pdm__serving__inference_log__InferenceLog" {
 
-            graph [style="filled,rounded", fillcolor="#80808018", label="pdm.serving.inference_log.InferenceLog"];
-            "pdm__serving__inference_log__InferenceLog____init__" [label="__init__", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.__init__\nsrc/pdm/serving/inference_log.py:34\nmethod in pdm.serving.inference_log.InferenceLog"];
-            "pdm__serving__inference_log__InferenceLog___connect" [label="_connect", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog._connect\nsrc/pdm/serving/inference_log.py:39\nmethod in pdm.serving.inference_log.InferenceLog"];
-            "pdm__serving__inference_log__InferenceLog___init_db" [label="_init_db", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog._init_db\nsrc/pdm/serving/inference_log.py:42\nmethod in pdm.serving.inference_log.InferenceLog"];
-            "pdm__serving__inference_log__InferenceLog___rows" [label="_rows", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog._rows\nsrc/pdm/serving/inference_log.py:82\nmethod in pdm.serving.inference_log.InferenceLog"];
-            "pdm__serving__inference_log__InferenceLog__read_for_assets" [label="read_for_assets", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.read_for_assets\nsrc/pdm/serving/inference_log.py:115\nmethod in pdm.serving.inference_log.InferenceLog"];
-            "pdm__serving__inference_log__InferenceLog__read_recent" [label="read_recent", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.read_recent\nsrc/pdm/serving/inference_log.py:108\nmethod in pdm.serving.inference_log.InferenceLog"];
-            "pdm__serving__inference_log__InferenceLog__read_since" [label="read_since", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.read_since\nsrc/pdm/serving/inference_log.py:111\nmethod in pdm.serving.inference_log.InferenceLog"];
-            "pdm__serving__inference_log__InferenceLog__record" [label="record", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.record\nsrc/pdm/serving/inference_log.py:53\nmethod in pdm.serving.inference_log.InferenceLog"];
+                graph [style="filled,rounded", fillcolor="#80808018", label="pdm.serving.inference_log.InferenceLog"];
+                "pdm__serving__inference_log__InferenceLog____init__" [label="__init__", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.__init__\nsrc/pdm/serving/inference_log.py:34\nmethod in pdm.serving.inference_log.InferenceLog"];
+                "pdm__serving__inference_log__InferenceLog___connect" [label="_connect", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog._connect\nsrc/pdm/serving/inference_log.py:39\nmethod in pdm.serving.inference_log.InferenceLog"];
+                "pdm__serving__inference_log__InferenceLog___init_db" [label="_init_db", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog._init_db\nsrc/pdm/serving/inference_log.py:42\nmethod in pdm.serving.inference_log.InferenceLog"];
+                "pdm__serving__inference_log__InferenceLog___rows" [label="_rows", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog._rows\nsrc/pdm/serving/inference_log.py:82\nmethod in pdm.serving.inference_log.InferenceLog"];
+                "pdm__serving__inference_log__InferenceLog__read_for_assets" [label="read_for_assets", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.read_for_assets\nsrc/pdm/serving/inference_log.py:115\nmethod in pdm.serving.inference_log.InferenceLog"];
+                "pdm__serving__inference_log__InferenceLog__read_recent" [label="read_recent", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.read_recent\nsrc/pdm/serving/inference_log.py:108\nmethod in pdm.serving.inference_log.InferenceLog"];
+                "pdm__serving__inference_log__InferenceLog__read_since" [label="read_since", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.read_since\nsrc/pdm/serving/inference_log.py:111\nmethod in pdm.serving.inference_log.InferenceLog"];
+                "pdm__serving__inference_log__InferenceLog__record" [label="record", style="filled", fillcolor="#324affb2", fontcolor="#000000", group="11", tooltip="pdm.serving.inference_log.InferenceLog.record\nsrc/pdm/serving/inference_log.py:53\nmethod in pdm.serving.inference_log.InferenceLog"];
+            }
         }
         subgraph "cluster_pdm__training__evaluate" {
 
@@ -139,35 +139,46 @@ digraph G {
 
             graph [style="filled,rounded", fillcolor="#80808018", label="pdm.training.rul_model"];
             "pdm__training__rul_model__OUTPUT_COLUMNS" [label="OUTPUT_COLUMNS", style="filled", fillcolor="#f565ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.OUTPUT_COLUMNS\nsrc/pdm/training/rul_model.py:25\nname in pdm.training.rul_model"];
-            "pdm__training__rul_model__RULIntervalModel" [label="RULIntervalModel", style="filled", fillcolor="#f565ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel\nsrc/pdm/training/rul_model.py:54\nclass in pdm.training.rul_model"];
-            "pdm__training__rul_model__RULPyfunc" [label="RULPyfunc", style="filled", fillcolor="#f565ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULPyfunc\nsrc/pdm/training/rul_model.py:121\nclass in pdm.training.rul_model"];
+            "pdm__training__rul_model__RULIntervalModel" [label="RULIntervalModel", style="filled", fillcolor="#f565ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel\nsrc/pdm/training/rul_model.py:77\nclass in pdm.training.rul_model"];
+            "pdm__training__rul_model__RULPyfunc" [label="RULPyfunc", style="filled", fillcolor="#f565ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULPyfunc\nsrc/pdm/training/rul_model.py:146\nclass in pdm.training.rul_model"];
+            "pdm__training__rul_model__SeedEnsemble" [label="SeedEnsemble", style="filled", fillcolor="#f565ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.SeedEnsemble\nsrc/pdm/training/rul_model.py:53\nclass in pdm.training.rul_model"];
+            "pdm__training__rul_model___fit_point" [label="_fit_point", style="filled", fillcolor="#f565ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model._fit_point\nsrc/pdm/training/rul_model.py:65\nfunction in pdm.training.rul_model"];
             "pdm__training__rul_model___make_regressor" [label="_make_regressor", style="filled", fillcolor="#f565ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model._make_regressor\nsrc/pdm/training/rul_model.py:28\nfunction in pdm.training.rul_model"];
-        }
-        subgraph "cluster_pdm__training__rul_model__RULIntervalModel" {
+            subgraph "cluster_pdm__training__rul_model__RULIntervalModel" {
 
-            graph [style="filled,rounded", fillcolor="#80808018", label="pdm.training.rul_model.RULIntervalModel"];
-            "pdm__training__rul_model__RULIntervalModel__decision_signal" [label="decision_signal", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.decision_signal\nsrc/pdm/training/rul_model.py:113\nmethod in pdm.training.rul_model.RULIntervalModel"];
-            "pdm__training__rul_model__RULIntervalModel__feature_columns" [label="feature_columns", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.feature_columns\nsrc/pdm/training/rul_model.py:55\nname in pdm.training.rul_model.RULIntervalModel"];
-            "pdm__training__rul_model__RULIntervalModel__fit" [label="fit", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.fit\nsrc/pdm/training/rul_model.py:65\nclassmethod in pdm.training.rul_model.RULIntervalModel"];
-            "pdm__training__rul_model__RULIntervalModel__maintenance_threshold" [label="maintenance_threshold", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.maintenance_threshold\nsrc/pdm/training/rul_model.py:61\nname in pdm.training.rul_model.RULIntervalModel"];
-            "pdm__training__rul_model__RULIntervalModel__point" [label="point", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.point\nsrc/pdm/training/rul_model.py:56\nname in pdm.training.rul_model.RULIntervalModel"];
-            "pdm__training__rul_model__RULIntervalModel__predict_frame" [label="predict_frame", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.predict_frame\nsrc/pdm/training/rul_model.py:94\nmethod in pdm.training.rul_model.RULIntervalModel"];
-        }
-        subgraph "cluster_pdm__training__rul_model__RULPyfunc" {
+                graph [style="filled,rounded", fillcolor="#80808018", label="pdm.training.rul_model.RULIntervalModel"];
+                "pdm__training__rul_model__RULIntervalModel__decision_signal" [label="decision_signal", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.decision_signal\nsrc/pdm/training/rul_model.py:138\nmethod in pdm.training.rul_model.RULIntervalModel"];
+                "pdm__training__rul_model__RULIntervalModel__feature_columns" [label="feature_columns", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.feature_columns\nsrc/pdm/training/rul_model.py:78\nname in pdm.training.rul_model.RULIntervalModel"];
+                "pdm__training__rul_model__RULIntervalModel__fit" [label="fit", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.fit\nsrc/pdm/training/rul_model.py:88\nclassmethod in pdm.training.rul_model.RULIntervalModel"];
+                "pdm__training__rul_model__RULIntervalModel__maintenance_threshold" [label="maintenance_threshold", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.maintenance_threshold\nsrc/pdm/training/rul_model.py:84\nname in pdm.training.rul_model.RULIntervalModel"];
+                "pdm__training__rul_model__RULIntervalModel__point" [label="point", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.point\nsrc/pdm/training/rul_model.py:79\nname in pdm.training.rul_model.RULIntervalModel"];
+                "pdm__training__rul_model__RULIntervalModel__predict_frame" [label="predict_frame", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULIntervalModel.predict_frame\nsrc/pdm/training/rul_model.py:119\nmethod in pdm.training.rul_model.RULIntervalModel"];
+            }
+            subgraph "cluster_pdm__training__rul_model__RULPyfunc" {
 
-            graph [style="filled,rounded", fillcolor="#80808018", label="pdm.training.rul_model.RULPyfunc"];
-            "pdm__training__rul_model__RULPyfunc____init__" [label="__init__", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULPyfunc.__init__\nsrc/pdm/training/rul_model.py:124\nmethod in pdm.training.rul_model.RULPyfunc"];
-            "pdm__training__rul_model__RULPyfunc__predict" [label="predict", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULPyfunc.predict\nsrc/pdm/training/rul_model.py:127\nmethod in pdm.training.rul_model.RULPyfunc"];
+                graph [style="filled,rounded", fillcolor="#80808018", label="pdm.training.rul_model.RULPyfunc"];
+                "pdm__training__rul_model__RULPyfunc____init__" [label="__init__", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULPyfunc.__init__\nsrc/pdm/training/rul_model.py:149\nmethod in pdm.training.rul_model.RULPyfunc"];
+                "pdm__training__rul_model__RULPyfunc__predict" [label="predict", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.RULPyfunc.predict\nsrc/pdm/training/rul_model.py:152\nmethod in pdm.training.rul_model.RULPyfunc"];
+            }
+            subgraph "cluster_pdm__training__rul_model__SeedEnsemble" {
+
+                graph [style="filled,rounded", fillcolor="#80808018", label="pdm.training.rul_model.SeedEnsemble"];
+                "pdm__training__rul_model__SeedEnsemble____init__" [label="__init__", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.SeedEnsemble.__init__\nsrc/pdm/training/rul_model.py:58\nmethod in pdm.training.rul_model.SeedEnsemble"];
+                "pdm__training__rul_model__SeedEnsemble__predict" [label="predict", style="filled", fillcolor="#f232ffb2", fontcolor="#000000", group="14", tooltip="pdm.training.rul_model.SeedEnsemble.predict\nsrc/pdm/training/rul_model.py:61\nmethod in pdm.training.rul_model.SeedEnsemble"];
+            }
         }
         subgraph "cluster_pdm__training__train" {
 
             graph [style="filled,rounded", fillcolor="#80808018", label="pdm.training.train"];
-            "pdm__training__train___fit_model" [label="_fit_model", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train._fit_model\nsrc/pdm/training/train.py:41\nfunction in pdm.training.train"];
-            "pdm__training__train___run_bundle_training" [label="_run_bundle_training", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train._run_bundle_training\nsrc/pdm/training/train.py:251\nfunction in pdm.training.train"];
-            "pdm__training__train__add_outcome_labels" [label="add_outcome_labels", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train.add_outcome_labels\nsrc/pdm/training/train.py:207\nfunction in pdm.training.train"];
-            "pdm__training__train__base_data_manifest" [label="base_data_manifest", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train.base_data_manifest\nsrc/pdm/training/train.py:238\nfunction in pdm.training.train"];
-            "pdm__training__train__fit_bundle" [label="fit_bundle", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train.fit_bundle\nsrc/pdm/training/train.py:138\nfunction in pdm.training.train"];
-            "pdm__training__train__run_training" [label="run_training", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train.run_training\nsrc/pdm/training/train.py:56\nfunction in pdm.training.train"];
+            "pdm__training__train___choose_maintenance_threshold" [label="_choose_maintenance_threshold", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train._choose_maintenance_threshold\nsrc/pdm/training/train.py:265\nfunction in pdm.training.train"];
+            "pdm__training__train___fit_bundle_cv" [label="_fit_bundle_cv", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train._fit_bundle_cv\nsrc/pdm/training/train.py:189\nfunction in pdm.training.train"];
+            "pdm__training__train___fit_model" [label="_fit_model", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train._fit_model\nsrc/pdm/training/train.py:42\nfunction in pdm.training.train"];
+            "pdm__training__train___run_bundle_training" [label="_run_bundle_training", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train._run_bundle_training\nsrc/pdm/training/train.py:330\nfunction in pdm.training.train"];
+            "pdm__training__train___set_feature_ranges" [label="_set_feature_ranges", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train._set_feature_ranges\nsrc/pdm/training/train.py:256\nfunction in pdm.training.train"];
+            "pdm__training__train__add_outcome_labels" [label="add_outcome_labels", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train.add_outcome_labels\nsrc/pdm/training/train.py:286\nfunction in pdm.training.train"];
+            "pdm__training__train__base_data_manifest" [label="base_data_manifest", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train.base_data_manifest\nsrc/pdm/training/train.py:317\nfunction in pdm.training.train"];
+            "pdm__training__train__fit_bundle" [label="fit_bundle", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train.fit_bundle\nsrc/pdm/training/train.py:139\nfunction in pdm.training.train"];
+            "pdm__training__train__run_training" [label="run_training", style="filled", fillcolor="#ff65d1b2", fontcolor="#000000", group="15", tooltip="pdm.training.train.run_training\nsrc/pdm/training/train.py:57\nfunction in pdm.training.train"];
         }
     }
         "pdm__common__config__get_settings" -> "pdm__common__config__Settings" [style="solid",  color="#000000"];
@@ -245,6 +256,7 @@ digraph G {
         "pdm__training__retrain__retrain" -> "pdm__training__retrain__refresh_labels" [style="solid",  color="#000000"];
         "pdm__training__retrain__retrain" -> "pdm__training__train__run_training" [style="solid",  color="#000000"];
         "pdm__training__rul_model__RULIntervalModel__decision_signal" -> "pdm__training__rul_model__RULIntervalModel__predict_frame" [style="solid",  color="#000000"];
+        "pdm__training__rul_model__RULIntervalModel__fit" -> "pdm__training__rul_model___fit_point" [style="solid",  color="#000000"];
         "pdm__training__rul_model__RULIntervalModel__fit" -> "pdm__training__rul_model___make_regressor" [style="solid",  color="#000000"];
         "pdm__training__rul_model__RULIntervalModel__predict_frame" -> "pdm__training__rul_model__OUTPUT_COLUMNS" [style="solid",  color="#000000"];
         "pdm__training__rul_model__RULIntervalModel__predict_frame" -> "pdm__training__rul_model__RULIntervalModel__feature_columns" [style="solid",  color="#000000"];
@@ -253,6 +265,19 @@ digraph G {
         "pdm__training__rul_model__RULIntervalModel__predict_frame" -> "pdm__training__rul_model___make_regressor" [style="solid",  color="#000000"];
         "pdm__training__rul_model__RULPyfunc____init__" -> "pdm__training__rul_model__RULIntervalModel" [style="solid",  color="#000000"];
         "pdm__training__rul_model__RULPyfunc__predict" -> "pdm__training__rul_model__RULIntervalModel__predict_frame" [style="solid",  color="#000000"];
+        "pdm__training__rul_model__SeedEnsemble__predict" -> "pdm__training__rul_model__SeedEnsemble____init__" [style="solid",  color="#000000"];
+        "pdm__training__rul_model___fit_point" -> "pdm__training__rul_model__SeedEnsemble" [style="solid",  color="#000000"];
+        "pdm__training__rul_model___fit_point" -> "pdm__training__rul_model__SeedEnsemble____init__" [style="solid",  color="#000000"];
+        "pdm__training__rul_model___fit_point" -> "pdm__training__rul_model___make_regressor" [style="solid",  color="#000000"];
+        "pdm__training__train___choose_maintenance_threshold" -> "pdm__common__config__load_yaml" [style="solid",  color="#000000"];
+        "pdm__training__train___choose_maintenance_threshold" -> "pdm__evaluation__decision__choose_threshold" [style="solid",  color="#000000"];
+        "pdm__training__train___choose_maintenance_threshold" -> "pdm__evaluation__decision__threshold_grid" [style="solid",  color="#000000"];
+        "pdm__training__train___fit_bundle_cv" -> "pdm__training__evaluate__rmse" [style="solid",  color="#000000"];
+        "pdm__training__train___fit_bundle_cv" -> "pdm__training__rul_model__RULIntervalModel__fit" [style="solid",  color="#000000"];
+        "pdm__training__train___fit_bundle_cv" -> "pdm__training__rul_model___fit_point" [style="solid",  color="#000000"];
+        "pdm__training__train___fit_bundle_cv" -> "pdm__training__rul_model___make_regressor" [style="solid",  color="#000000"];
+        "pdm__training__train___fit_bundle_cv" -> "pdm__training__train___choose_maintenance_threshold" [style="solid",  color="#000000"];
+        "pdm__training__train___fit_bundle_cv" -> "pdm__training__train___set_feature_ranges" [style="solid",  color="#000000"];
         "pdm__training__train___run_bundle_training" -> "pdm__common__config__set_experiment_with_artifact_root" [style="solid",  color="#000000"];
         "pdm__training__train___run_bundle_training" -> "pdm__drift__life_stage__add_oof_predictions" [style="solid",  color="#000000"];
         "pdm__training__train___run_bundle_training" -> "pdm__drift__reference__DRIFT_REFERENCE_ARTIFACT_DIR" [style="solid",  color="#000000"];
@@ -263,11 +288,11 @@ digraph G {
         "pdm__training__train___run_bundle_training" -> "pdm__training__train__fit_bundle" [style="solid",  color="#000000"];
         "pdm__training__train__add_outcome_labels" -> "pdm__common__config__get_settings" [style="solid",  color="#000000"];
         "pdm__training__train__add_outcome_labels" -> "pdm__labels__build__load_label_dataset" [style="solid",  color="#000000"];
-        "pdm__training__train__fit_bundle" -> "pdm__common__config__load_yaml" [style="solid",  color="#000000"];
-        "pdm__training__train__fit_bundle" -> "pdm__evaluation__decision__choose_threshold" [style="solid",  color="#000000"];
-        "pdm__training__train__fit_bundle" -> "pdm__evaluation__decision__threshold_grid" [style="solid",  color="#000000"];
         "pdm__training__train__fit_bundle" -> "pdm__training__evaluate__rmse" [style="solid",  color="#000000"];
         "pdm__training__train__fit_bundle" -> "pdm__training__rul_model__RULIntervalModel__fit" [style="solid",  color="#000000"];
+        "pdm__training__train__fit_bundle" -> "pdm__training__train___choose_maintenance_threshold" [style="solid",  color="#000000"];
+        "pdm__training__train__fit_bundle" -> "pdm__training__train___fit_bundle_cv" [style="solid",  color="#000000"];
+        "pdm__training__train__fit_bundle" -> "pdm__training__train___set_feature_ranges" [style="solid",  color="#000000"];
         "pdm__training__train__run_training" -> "pdm__common__config__set_experiment_with_artifact_root" [style="solid",  color="#000000"];
         "pdm__training__train__run_training" -> "pdm__data__datasets__get_adapter" [style="solid",  color="#000000"];
         "pdm__training__train__run_training" -> "pdm__training__evaluate__passes_validation_gate" [style="solid",  color="#000000"];

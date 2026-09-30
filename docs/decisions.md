@@ -45,6 +45,10 @@ code states a reason, it's in the relevant module's docstring.
 | D-22 | End-to-end test of the whole loop without Docker | Accepted | 2026-09-30 |
 | D-23 | Move docs to `/docs`; split run log from how-it-runs doc | Accepted | 2026-09-30 |
 | D-24 | Static call graph with pyan3 + Graphviz | Accepted | 2026-09-30 |
+| D-25 | One OpenMP thread per serving process | Accepted | 2026-09-30 |
+| D-26 | Cross-validated calibration of interval and threshold | Accepted | 2026-09-30 |
+| D-27 | Trend features (5- minus 20-cycle mean) | Proposed | 2026-09-30 |
+| D-28 | Hyperparameter tuning and seed averaging | Rejected | 2026-09-30 |
 
 ---
 
@@ -374,10 +378,9 @@ code states a reason, it's in the relevant module's docstring.
 - **Actual effect:**
   - NASA test set: **91% coverage, 65 cycles wide** on average. The first LightGBM
     attempt was 86 wide with a constant upper bound.
-  - **Found later:** one prediction takes about 47 ms, and in the FD003 replay (D-20)
-    requests took about 72 ms each, logging included. The three models alone take
-    about 18 ms, so most of the time is overhead. Measured while other jobs were
-    running; to be re-measured and fixed in the model-quality phase.
+  - **Found later:** requests took about 72 ms each during the FD003 replay (D-20). On
+    an idle machine a full `POST /predict` takes about 17 ms. The 72 ms came from CPU
+    contention making every model call's thread pool thrash, which is fixed by D-25.
 - **Evidence:** `run_log.md` section 10, commit `54570a3`.
 - **Related:** D-13.
 
@@ -439,8 +442,13 @@ code states a reason, it's in the relevant module's docstring.
   | v3 | 42 (same as v1) | 12.68 | **rejected** vs v2 (limit 12.30) |
 
   **Changing only the seed moves cost by about 8%, more than the 5% tolerance**, so
-  promotions partly depend on seed luck. This is open; the fix is to reduce
-  seed-to-seed variance (planned: averaging several seeds).
+  promotions partly depend on seed luck.
+
+  **Later correction (D-26, D-28):** the cause was not model randomness. LightGBM with
+  these settings gives the same model for every seed. The seed only changed which 16
+  engines calibrated the interval and chose the threshold. Averaging seeds had no
+  effect (D-28). Calibrating on all engines by cross-validation cut the cost spread
+  from ±1.90 to ±0.20 (D-26), which is now well inside the 5% tolerance.
 - **Evidence:** `run_log.md` section 10.
 - **Related:** D-11, D-13, D-20.
 
@@ -734,7 +742,157 @@ code states a reason, it's in the relevant module's docstring.
 - **Trade-offs accepted:** Approximate edges.
 - **Expected effect:** Graphs regenerate in seconds.
 - **Actual effect:** Four graphs (full, retrain, drift, serving) generate in a few
-  seconds. The first attempt put absolute machine paths in tooltips, so the script now
-  strips them.
+  seconds.
+  - The first attempt put absolute machine paths in tooltips, so the script now strips
+    them.
+  - After more modules were added, Graphviz 2.43 crashed on the full graph ("trouble in
+    init_rank") with pyan3's `--grouped` layout. `-Gnewrank=true` didn't help;
+    `--nested-groups` renders fine, so the script uses that.
 - **Evidence:** `docs/call_graph/`.
 - **Related:** D-23.
+
+## D-25: One OpenMP thread per serving process
+- **Date:** 2026-09-30
+- **Status:** Accepted
+- **Context:**
+  - Requests took about 72 ms in the FD003 replay, against about 17 ms on an idle
+    machine.
+  - LightGBM and scikit-learn use OpenMP, a library that splits work across threads.
+    By default it starts a thread per CPU core on every call.
+  - Serving scores one row per request, so there's nothing worth splitting.
+- **Options considered:**
+  1. Leave the default.
+     *Pro:* nothing to change. *Con:* see the measurements below.
+  2. Limit threads at runtime with `threadpoolctl`, once at startup.
+     *Pro:* configurable in YAML. *Con:* **didn't work.** OpenMP limits apply only to
+     the thread that sets them, and FastAPI runs requests on other worker threads.
+     Measured 19.3 ms, no better. Entering the limit on every call instead costs about
+     5 ms itself (14.0 vs 17.8 ms).
+  3. `OMP_NUM_THREADS=1` in the serving image.
+     *Pro:* process-wide from start; one line. *Con:* applies to every OpenMP call in
+     serving, which is fine for one-row requests.
+- **Decision:** Option 3 (`docker/serve.Dockerfile`). Only the serving image: training
+  and drift jobs process large batches, where threads help.
+- **Factors that led to it:** The measurements below; option 2 failed its own test.
+- **Trade-offs accepted:** If serving ever scores big batches, it won't parallelise
+  them.
+- **Expected effect:** Slightly faster when idle; much steadier under load.
+- **Actual effect** (full `POST /predict`, 4-CPU machine):
+
+  | | Idle | All 4 cores busy |
+  |---|---|---|
+  | Default threads | 17.4–18.3 ms | **630–1,359 ms** |
+  | `OMP_NUM_THREADS=1` | 16.6–17.3 ms | **30–32 ms** |
+
+  Under load the default would trip the 1-second `ServingHighLatencyP95` alert. Not
+  yet measured inside the real container or cluster (no Docker here).
+- **Evidence:** measurements in `run_log.md` section 14.
+- **Related:** D-12, D-20.
+
+## D-26: Cross-validated calibration of interval and threshold
+- **Date:** 2026-09-30
+- **Status:** Accepted
+- **Context:**
+  - Holdout cost varied ±1.90 per engine across seeds (D-14): more than the gate's 5%
+    tolerance, so promotions were partly luck.
+  - The experiment showed the seed only changed *which* 16 validation engines set the
+    interval and the maintenance threshold.
+- **Options considered:**
+  1. Widen the gate tolerance.
+     *Pro:* one number. *Con:* the gate stops catching real regressions.
+  2. Average several seeds (D-28).
+     *Pro:* standard for noisy models. *Con:* **no effect**: the models are identical
+     across seeds.
+  3. Cross-validation: every training engine is predicted by models that never saw it
+     (5 engine-grouped folds). Those predictions set the interval and threshold; the
+     final models train on all engines.
+     *Pro:* uses all 80 engines instead of 16. *Con:* 6 fits instead of 1.
+- **Decision:** Option 3 (`model.calibration: cross_validation`, `cv_folds: 5`,
+  `_fit_bundle_cv` in `src/pdm/training/train.py`). The old split is still available
+  with `calibration: split`.
+- **Factors that led to it:** The measurements below; no API change.
+- **Trade-offs accepted:**
+  - Training takes 30 s instead of about 15 s.
+  - Rows from one engine are correlated, so the conformal coverage guarantee is
+    approximate. Measured coverage: 86–88%.
+- **Expected effect:** A smaller cost spread; slightly better RMSE, because the final
+  model sees 25% more engines.
+- **Actual effect** (5 seeds each, `reports/model_quality_cv.json`):
+
+  | | Split (before) | Cross-validation (now) |
+  |---|---|---|
+  | Holdout cost per engine | 12.99 ± 1.90 | **12.38 ± 0.20** |
+  | Holdout unplanned failures (average) | 0.2 | **0.0** |
+  | NASA test RMSE | 22.28 ± 0.27 | **21.40 ± 0.00** |
+  | Interval coverage / width | 89% / 58.9 | 88% / 57.0 |
+
+  A real `pdm.training.train` run with the new config took 30 s. It scored test RMSE
+  21.40, coverage 87%, holdout cost 12.21, 0 failures, threshold 12.
+- **Evidence:** `reports/model_quality_cv.json`,
+  `scripts/experiments/model_quality.py`, `tests/unit/test_cv_calibration.py`,
+  `run_log.md` section 15.
+- **Related:** D-12, D-13, D-14, D-28.
+
+## D-27: Trend features (5- minus 20-cycle mean)
+- **Date:** 2026-09-30
+- **Status:** Proposed (not adopted)
+- **Context:** The model is mediocre (RMSE about 21–22 against published 12–18, D-1).
+  One cheap extra signal is how fast each sensor is changing.
+- **Options considered:**
+  1. Keep the current 17 features.
+     *Pro:* no API change. *Con:* weaker RMSE.
+  2. Add 14 trend features (5-cycle mean minus 20-cycle mean, per sensor).
+     *Pro:* big RMSE gain. *Con:* every client must compute and send 14 more
+     features; drift checks must be recalibrated; old logged readings can't become
+     labels (D-19).
+- **Decision:** Not adopted yet. The evidence disagrees with itself, and the change is
+  expensive.
+- **Factors that led to it:**
+
+  | | Cross-validation, current features | Cross-validation, + trend |
+  |---|---|---|
+  | NASA test RMSE | 21.40 | **17.75** |
+  | Interval width | 57.0 | 48.9 |
+  | Validation cost (training data) | 11.97 ± 0.20 | **10.84 ± 0.05** |
+  | **Holdout** cost | **12.38 ± 0.20** | 14.72 ± 2.01 |
+  | **Holdout** unplanned failures | **0.0** | 0.8 |
+
+  Better accuracy on average, but on the 20 frozen holdout engines it misses about one
+  failure. It chooses lower thresholds (8–11 instead of 12–15), leaving less margin.
+  20 engines are too few to say whether that's real or luck, and the gate would
+  reject it today on failures.
+- **Trade-offs accepted:** Leaving a likely RMSE gain on the table.
+- **Expected effect:** n/a until adopted.
+- **Actual effect:** Not yet measured in production.
+- **Next step:** Measure decision cost with cross-validation across all 100 FD001
+  engines, plus FD003, before deciding. If adopted, it needs a versioned API.
+- **Evidence:** `reports/model_quality.json`, `reports/model_quality_cv.json`.
+- **Related:** D-1, D-19, D-26.
+
+## D-28: Hyperparameter tuning and seed averaging
+- **Date:** 2026-09-30
+- **Status:** Rejected
+- **Context:** Cheap model-quality ideas, tested with the same 5 seeds as everything
+  else.
+- **Options considered:**
+  1. Three tuned settings (`tuned_a/b/c`), with the winner chosen on internal
+     validation RMSE (the test set is never used to choose).
+     *Pro:* standard. *Con:* see below.
+  2. Averaging 5 seeds of the point model.
+     *Pro:* reduces model variance. *Con:* see below.
+  3. Keep the defaults.
+- **Decision:** Option 3. `ensemble_seeds` stays in the code, off by default: it
+  matters if a future configuration makes LightGBM random.
+- **Factors that led to it:**
+  - **Seed averaging changed nothing** (identical to the baseline to every decimal
+    place). Without row or column sampling, LightGBM is deterministic.
+  - **Tuning:** validation RMSE picked `tuned_b`, which had the worst holdout cost
+    (14.30, 0.4 failures), so RMSE is the wrong way to choose. `tuned_c` looked best
+    on holdout cost with a split, but with cross-validation it matches the defaults
+    (12.29 vs 12.38; test RMSE 21.39 vs 21.40) and is slower (11.8 vs 8.2 ms). Its
+    split advantage was mostly the calibration lottery.
+- **Trade-offs accepted:** None meaningful.
+- **Expected effect:** n/a.
+- **Actual effect:** n/a (not adopted).
+- **Evidence:** `reports/model_quality.json`, `reports/model_quality_cv.json`.
+- **Related:** D-14, D-26.

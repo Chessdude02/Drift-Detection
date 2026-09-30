@@ -129,3 +129,16 @@ def test_gate_absolute_floor_applies_even_when_champion_is_worse():
 def test_first_promotion_needs_a_human():
     assert not decide(CHAMPION, None, GATE, 0.9).approved
     assert decide(CHAMPION, None, GATE, 0.9, bootstrap_confirmed=True).approved
+
+
+def test_seed_ensemble_averages_one_model_per_seed():
+    from pdm.training.rul_model import SeedEnsemble
+
+    rng = np.random.default_rng(3)
+    X = pd.DataFrame({"x": rng.uniform(0, 10, 500)})
+    y = pd.Series(2 * X["x"] + rng.normal(size=500))
+    params = {"n_estimators": 20, "verbose": -1, "subsample": 0.7, "subsample_freq": 1}
+    model = RULIntervalModel.fit("lightgbm", params, X, y, ensemble_seeds=[1, 2, 3])
+    assert isinstance(model.point, SeedEnsemble) and len(model.point.models) == 3
+    expected = np.mean([m.predict(X) for m in model.point.models], axis=0)
+    np.testing.assert_allclose(model.predict_frame(X)["rul"], expected)

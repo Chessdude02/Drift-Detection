@@ -5,11 +5,26 @@ __init__
     [U] _SCHEMA
     [U] _connect
     [U] _init_db
+_choose_maintenance_threshold
+    [U] choose_threshold
+    [U] load_yaml
+    [U] threshold_grid
 _cmapss_features
     [U] build_feature_matrix
     [U] cap_rul
     [U] feature_columns
     [U] load_train
+_fit_bundle_cv
+    [U] _choose_maintenance_threshold
+    [U] _fit_point
+    [U] _make_regressor
+    [U] _set_feature_ranges
+    [U] fit
+    [U] rmse
+_fit_point
+    [U] SeedEnsemble
+    [U] __init__
+    [U] _make_regressor
 _init_db
     [U] _ADDED_COLUMNS
     [U] _SCHEMA
@@ -63,13 +78,14 @@ events
 feature_columns
     [U] OP_SETTING_COLUMNS
 fit
+    [U] _fit_point
     [U] _make_regressor
 fit_bundle
-    [U] choose_threshold
+    [U] _choose_maintenance_threshold
+    [U] _fit_bundle_cv
+    [U] _set_feature_ranges
     [U] fit
-    [U] load_yaml
     [U] rmse
-    [U] threshold_grid
 get_adapter
     [U] _ADAPTERS
 get_rollback_target
@@ -96,6 +112,7 @@ load_train
 load_yaml
     [U] CONFIG_DIR
 predict
+    [U] __init__
     [U] predict_frame
 predict_frame
     [U] OUTPUT_COLUMNS

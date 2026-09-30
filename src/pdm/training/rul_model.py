@@ -50,6 +50,29 @@ def _make_regressor(algorithm: str, params: dict, quantile: float | None = None)
     return XGBRegressor(**params)
 
 
+class SeedEnsemble:
+    """Average of the same regressor trained with different random seeds. Seed-to-seed
+    variance moved holdout cost by ~8% (decisions.md D-14), more than the gate's
+    tolerance; averaging seeds is the standard way to shrink it."""
+
+    def __init__(self, models: list):
+        self.models = models
+
+    def predict(self, X):
+        return np.mean([m.predict(X) for m in self.models], axis=0)
+
+
+def _fit_point(algorithm: str, params: dict, X, y, ensemble_seeds: list[int] | None):
+    if not ensemble_seeds:
+        return _make_regressor(algorithm, params).fit(X, y)
+    return SeedEnsemble(
+        [
+            _make_regressor(algorithm, {**params, "random_state": seed}).fit(X, y)
+            for seed in ensemble_seeds
+        ]
+    )
+
+
 @dataclass
 class RULIntervalModel:
     feature_columns: list[str]
@@ -71,11 +94,13 @@ class RULIntervalModel:
         X_cal: pd.DataFrame | None = None,
         y_cal: pd.Series | None = None,
         coverage: float | None = None,
+        ensemble_seeds: list[int] | None = None,
     ) -> RULIntervalModel:
-        """Fits the point model on (X_fit, y_fit). If `coverage` is given, also fits the
-        quantile models on the same rows and calibrates the interval on (X_cal, y_cal),
-        which must come from different engines."""
-        point = _make_regressor(algorithm, params).fit(X_fit, y_fit)
+        """Fits the point model on (X_fit, y_fit) - one model, or the average of one per
+        seed in `ensemble_seeds`. If `coverage` is given, also fits the quantile models
+        on the same rows and calibrates the interval on (X_cal, y_cal), which must come
+        from different engines."""
+        point = _fit_point(algorithm, params, X_fit, y_fit, ensemble_seeds)
         model = cls(feature_columns=list(X_fit.columns), point=point)
         if coverage is None:
             return model

@@ -14,6 +14,11 @@ COPY --from=builder /root/.local /home/appuser/.local
 COPY src/pdm ./pdm
 COPY config ./config
 
+# One OpenMP thread per model call: serving scores one row per request, and with the
+# default (a thread per core) a busy node pushed /predict from ~30 ms to 630-1360 ms
+# (docs/decisions.md D-25). Must be an env var: OpenMP limits set at runtime only
+# apply to the thread that set them, not to the request worker threads.
+ENV OMP_NUM_THREADS=1
 ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1

@@ -131,6 +131,11 @@ the pipeline in `config/training.yaml` unchanged, mean ± std over 5 seeds.
   published C-MAPSS results (roughly 12-18 RMSE on FD001). It passes the
   `max_rmse: 35.0` gate by a wide margin, so that gate does not separate a good model
   from a mediocre one.
+- **Current pipeline** (`config/training.yaml`: 20 frozen holdout engines excluded,
+  cross-validated calibration): NASA FD001 test RMSE **21.4**, 87% interval coverage,
+  and on the frozen holdout 12.2 cost per engine with 0 unplanned failures. The table
+  above is the original pipeline. Details: `docs/decisions.md` D-26,
+  `reports/model_quality_cv.json`.
 - The single-split val RMSE that `train.py` logs (18.9 on FD001 with seed 42) is on the
   lucky side of its own ±2.6 spread; don't quote it as the model's accuracy.
 

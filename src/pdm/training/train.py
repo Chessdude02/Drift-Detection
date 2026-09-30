@@ -18,6 +18,7 @@ import tempfile
 from pathlib import Path
 
 import mlflow
+import numpy as np
 import pandas as pd
 
 from pdm.common.config import (
@@ -33,7 +34,7 @@ from pdm.drift.reference import DRIFT_REFERENCE_ARTIFACT_DIR, DRIFT_REFERENCE_FI
 from pdm.evaluation.decision import choose_threshold, threshold_grid
 from pdm.labels.build import load_label_dataset
 from pdm.training.evaluate import passes_validation_gate, rmse
-from pdm.training.rul_model import RULIntervalModel, RULPyfunc
+from pdm.training.rul_model import RULIntervalModel, RULPyfunc, _make_regressor
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,8 @@ def fit_bundle(feature_df, cols: list[str], config: dict, split_fn) -> dict:
     holdout) by pdm.evaluation.champion_challenger.
     """
     model_cfg = config["model"]
+    if model_cfg.get("calibration") == "cross_validation":
+        return _fit_bundle_cv(feature_df, cols, config)
     interval_cfg = model_cfg.get("intervals", {})
     random_state = model_cfg["params"].get("random_state", 42)
     train_idx, val_idx = split_fn(feature_df, model_cfg["val_split"], random_state)
@@ -159,13 +162,9 @@ def fit_bundle(feature_df, cols: list[str], config: dict, split_fn) -> dict:
         val_df[cols],
         val_df["rul"],
         coverage=coverage,
+        ensemble_seeds=model_cfg.get("ensemble_seeds"),
     )
-    # Training range per feature (5% margin each side); serving flags readings outside it.
-    lo, hi = train_df[cols].min(), train_df[cols].max()
-    margin = (hi - lo) * 0.05
-    bundle.info["feature_ranges"] = {
-        c: (float(lo[c] - margin[c]), float(hi[c] + margin[c])) for c in cols
-    }
+    _set_feature_ranges(bundle, train_df, cols)
     val_frame = bundle.predict_frame(val_df[cols])
     metrics = {"val_rmse": rmse(val_df["rul"], val_frame["rul"])}
     if coverage is not None:
@@ -178,30 +177,110 @@ def fit_bundle(feature_df, cols: list[str], config: dict, split_fn) -> dict:
         )
         metrics["conformal_correction"] = bundle.conformal_correction
 
-    decision = None
     if config.get("decision_config"):
-        decision_cfg = load_yaml(config["decision_config"])
-        # Only engine lives whose failure cycle is known can score a maintenance
-        # decision; censored (maintained) lives have no true_rul.
-        complete = val_df.groupby("unit_number")["true_rul"].transform(lambda s: s.notna().all())
-        scored = val_df[complete]
-        decision = choose_threshold(
-            scored,
-            bundle.decision_signal(scored[cols]),
-            threshold_grid(decision_cfg),
-            decision_cfg["lead_time_cycles"],
-            decision_cfg["costs"],
-        )
-        bundle.maintenance_threshold = decision["threshold"]
         metrics.update(
-            {
-                "maintenance_threshold": decision["threshold"],
-                "val_cost_per_engine": decision["cost_per_engine"],
-                "val_unplanned_failures": decision["unplanned_failures"],
-                "val_mean_wasted_cycles": decision["mean_wasted_cycles"],
-            }
+            _choose_maintenance_threshold(
+                bundle, val_df, bundle.decision_signal(val_df[cols]), config
+            )
         )
     return {"bundle": bundle, "train_df": train_df, "val_df": val_df, "metrics": metrics}
+
+
+def _fit_bundle_cv(feature_df, cols: list[str], config: dict) -> dict:
+    """`model.calibration: cross_validation`: every training engine is predicted once by
+    models that never saw it (engine-grouped K-fold), and those out-of-fold predictions
+    calibrate the interval and choose the maintenance threshold. The final models are
+    then fitted on ALL training engines.
+
+    Why: with a single 80/20 split, 16 validation engines set both the interval and the
+    threshold, and which 16 they are moved holdout cost by +/-1.9 per engine across
+    seeds - more than the gate's tolerance (docs/decisions.md D-14, D-26). Using all
+    engines removes that lottery, and the final model trains on 25% more engines.
+    Cost: K+1 fits instead of 1.
+    """
+    model_cfg = config["model"]
+    params, algorithm = model_cfg["params"], model_cfg["algorithm"]
+    interval_cfg = model_cfg.get("intervals", {})
+    coverage = interval_cfg.get("coverage") if interval_cfg.get("enabled") else None
+    k = model_cfg.get("cv_folds", 5)
+    seed = params.get("random_state", 42)
+    ensemble = model_cfg.get("ensemble_seeds")
+
+    units = feature_df["unit_number"].unique()
+    fold_of = {u: i % k for i, u in enumerate(np.random.default_rng(seed).permutation(units))}
+    folds = feature_df["unit_number"].map(fold_of).to_numpy()
+    X, y = feature_df[cols], feature_df["rul"]
+    oof = {"rul": np.zeros(len(X)), "lo": np.zeros(len(X)), "hi": np.zeros(len(X))}
+    for f in range(k):
+        fit_rows, held = folds != f, folds == f
+        fold_model = RULIntervalModel.fit(
+            algorithm, params, X[fit_rows], y[fit_rows], ensemble_seeds=ensemble
+        )
+        oof["rul"][held] = fold_model.point.predict(X[held])
+        if coverage is not None:
+            lower = _make_regressor(algorithm, params, (1 - coverage) / 2).fit(
+                X[fit_rows], y[fit_rows]
+            )
+            upper = _make_regressor(algorithm, params, 1 - (1 - coverage) / 2).fit(
+                X[fit_rows], y[fit_rows]
+            )
+            oof["lo"][held] = lower.predict(X[held])
+            oof["hi"][held] = upper.predict(X[held])
+
+    bundle = RULIntervalModel.fit(algorithm, params, X, y, ensemble_seeds=ensemble)
+    metrics = {"val_rmse": rmse(y, oof["rul"]), "cv_folds": float(k)}
+    signal = oof["rul"]
+    if coverage is not None:
+        # Same shape as predict_frame: the band always contains the point prediction.
+        lo = np.minimum(oof["lo"], oof["rul"])
+        hi = np.maximum(oof["hi"], oof["rul"])
+        yv = y.to_numpy(dtype=float)
+        scores = np.maximum(lo - yv, yv - hi)
+        n = len(scores)
+        q = float(np.quantile(scores, min(1.0, np.ceil((n + 1) * coverage) / n), method="higher"))
+        bundle.lower = _make_regressor(algorithm, params, (1 - coverage) / 2).fit(X, y)
+        bundle.upper = _make_regressor(algorithm, params, 1 - (1 - coverage) / 2).fit(X, y)
+        bundle.conformal_correction, bundle.coverage_target = q, coverage
+        lower_bound, upper_bound = np.maximum(lo - q, 0.0), hi + q
+        metrics["val_interval_coverage"] = float(np.mean((yv >= lower_bound) & (yv <= upper_bound)))
+        metrics["val_interval_mean_width"] = float(np.mean(upper_bound - lower_bound))
+        metrics["conformal_correction"] = q
+        signal = lower_bound
+
+    _set_feature_ranges(bundle, feature_df, cols)
+    if config.get("decision_config"):
+        metrics.update(_choose_maintenance_threshold(bundle, feature_df, signal, config))
+    return {"bundle": bundle, "train_df": feature_df, "val_df": feature_df, "metrics": metrics}
+
+
+def _set_feature_ranges(bundle, df, cols: list[str]) -> None:
+    """Training range per feature (5% margin each side); serving flags readings outside it."""
+    lo, hi = df[cols].min(), df[cols].max()
+    margin = (hi - lo) * 0.05
+    bundle.info["feature_ranges"] = {
+        c: (float(lo[c] - margin[c]), float(hi[c] + margin[c])) for c in cols
+    }
+
+
+def _choose_maintenance_threshold(bundle, df, signal, config: dict) -> dict:
+    """Picks the threshold on engine lives whose failure cycle is known (censored lives
+    have no true_rul), stores it in the bundle, returns the metrics to log."""
+    decision_cfg = load_yaml(config["decision_config"])
+    complete = df.groupby("unit_number")["true_rul"].transform(lambda s: s.notna().all())
+    decision = choose_threshold(
+        df[complete],
+        np.asarray(signal)[complete.to_numpy()],
+        threshold_grid(decision_cfg),
+        decision_cfg["lead_time_cycles"],
+        decision_cfg["costs"],
+    )
+    bundle.maintenance_threshold = decision["threshold"]
+    return {
+        "maintenance_threshold": decision["threshold"],
+        "val_cost_per_engine": decision["cost_per_engine"],
+        "val_unplanned_failures": decision["unplanned_failures"],
+        "val_mean_wasted_cycles": decision["mean_wasted_cycles"],
+    }
 
 
 def add_outcome_labels(feature_df, cols: list[str], config: dict):

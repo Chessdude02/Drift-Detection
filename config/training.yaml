@@ -36,7 +36,14 @@ model:
     num_leaves: 31
     random_state: 42
     verbose: -1
-  val_split: 0.2
+  val_split: 0.2                 # only used when calibration is split
+  # How the interval and maintenance threshold are calibrated:
+  #   cross_validation: every training engine predicted out-of-fold (cv_folds), final
+  #     model trained on all engines. Cut the seed-to-seed spread of holdout cost from
+  #     +/-1.90 to +/-0.20 and test RMSE 22.3 -> 21.4 (docs/decisions.md D-26).
+  #   split: one random val_split of engines (the old way; noisy with 16 engines).
+  calibration: cross_validation
+  cv_folds: 5
   # Calibrated prediction interval served next to the point RUL (pdm.training.rul_model).
   intervals:
     enabled: true

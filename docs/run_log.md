@@ -248,3 +248,51 @@ system-wide shift 30/30; normal traffic "ok" 30/30.
 
 End-to-end test (D-22): `pytest tests/integration/test_end_to_end_loop.py`, 2 passed in
 about 74 s.
+
+## 14. Phase 2F: serving latency
+
+Single-row timings on a 4-CPU machine, after 5-10 warm-up calls. Commands are in
+`decisions.md` D-25.
+
+- Components, idle: LightGBM point model 0.6 ms; each scikit-learn quantile model
+  2.6-3.4 ms; `predict_frame` 15 ms; pyfunc `predict` 17.3 ms (8.9 ms with a 1-thread
+  limit in the calling thread); log insert 1.6 ms; `GET /healthz` 1.4 ms.
+- Full `POST /predict` (300 calls idle, 40 calls under load; load = 4 busy-loop
+  processes):
+
+| Setting | Idle (2 runs) | Under load (2 runs) |
+|---|---|---|
+| default threads | 17.41, 18.31 ms | 629.95, 1358.99 ms |
+| `OMP_NUM_THREADS=1` | 16.59, 17.25 ms | 32.41, 30.38 ms |
+| threadpoolctl limit set once at startup | 19.26 ms (no effect) | not run |
+
+## 15. Phase 2F: model quality
+
+```bash
+python scripts/experiments/model_quality.py --raw-dir data/raw          # pass 1 -> reports/model_quality.json
+python scripts/experiments/model_quality.py --raw-dir data/raw \
+  --variants baseline baseline_cv tuned_c tuned_c_cv trend trend_cv --out reports/model_quality_cv.json
+```
+
+Seeds 42, 0, 1, 2, 3. Values are mean ± std over seeds. Latency is single-row with one
+thread.
+
+| Variant | Val RMSE | Test RMSE | Coverage | Width | Holdout cost | Failures | Latency |
+|---|---|---|---|---|---|---|---|
+| baseline | 22.89 ± 1.55 | 22.28 ± 0.27 | 0.89 | 58.9 | 12.99 ± 1.90 | 0.2 | 7.8–8.4 ms |
+| ensemble5 | identical to baseline | | | | | | 12.4 ms |
+| tuned_a | 22.62 ± 1.57 | 22.04 ± 0.42 | 0.89 | 59.3 | 13.30 ± 1.70 | 0.2 | 10.9 ms |
+| tuned_b | 22.30 ± 1.60 | 22.08 ± 0.48 | 0.88 | 59.8 | 14.30 ± 1.85 | 0.4 | 9.6 ms |
+| tuned_c | 22.92 ± 1.66 | 22.27 ± 0.44 | 0.89 | 58.8 | 12.13 ± 0.41 | 0.0 | 12.2 ms |
+| trend | 17.67 ± 1.13 | 18.11 ± 0.45 | 0.89 | 50.2 | 11.99 ± 1.99 | 0.2 | 8.0 ms |
+| **baseline_cv** | 21.31 ± 0.44 | **21.40 ± 0.00** | 0.88 | 57.0 | **12.38 ± 0.20** | **0.0** | 8.2 ms |
+| tuned_c_cv | 21.30 ± 0.45 | 21.39 ± 0.00 | 0.88 | 57.7 | 12.29 ± 0.17 | 0.0 | 11.8 ms |
+| trend_cv | 16.52 ± 0.40 | 17.75 ± 0.00 | 0.86 | 48.9 | 14.72 ± 2.01 | 0.8 | 8.5 ms |
+
+Validation (training-data-only) cost: baseline 11.73, baseline_cv 11.97, tuned_c_cv
+11.77, trend 10.83, trend_cv 10.84. Validation RMSE picked tuned_b in pass 1 and
+tuned_c in pass 2.
+
+Adopted: `calibration: cross_validation` (D-26). A real training run then took 30 s:
+test RMSE 21.40, coverage 87%, holdout cost 12.21, 0 failures, threshold 12. Suite: 144
+passed, plus the one failure that predates these changes.
