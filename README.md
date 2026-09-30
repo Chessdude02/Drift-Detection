@@ -6,6 +6,13 @@ FastAPI, and keep it healthy in production with automated CI/CD, staged rollouts
 rollback, drift-triggered retraining, shadow deployment, and Prometheus/Grafana
 observability.
 
+## Documentation
+
+- [`docs/execution.md`](docs/execution.md): how the code runs (entry points, flow, call graph, config, failure paths).
+- [`docs/decisions.md`](docs/decisions.md): why it is built this way, with measured effects.
+- [`docs/run_log.md`](docs/run_log.md): every measurement run and its numbers.
+- [`RUNBOOK.md`](RUNBOOK.md): operations (alerts, outcomes, rollback).
+
 ## Architecture
 
 ```
@@ -136,7 +143,7 @@ the pipeline in `config/training.yaml` unchanged, mean ± std over 5 seeds.
   older than the training data does not count as drift.
 - **Sensor-fault alert:** predicts each sensor from the other 13 and flags a sensor whose
   prediction error shifts (`src/pdm/drift/sensor_check.py`). It raises the
-  `SensorFaultSuspected` alert and **never** triggers retraining. Why: see `decisions.md`.
+  `SensorFaultSuspected` alert and **never** triggers retraining. Why: see `docs/decisions.md` (D-5, D-21).
 
 Benchmark: 500-row windows, reference = 80 FD001 training engines, 20 windows per
 scenario. "Original" = the check as it first shipped (Evidently defaults, plain

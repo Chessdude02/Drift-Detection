@@ -1,7 +1,7 @@
-# Executions
+# Run log
 
 What was run, in order, and what came out. Use it to reproduce any number in the README
-or `decisions.md`. Commands run from the repo root on Linux, Python 3.11.
+or [`decisions.md`](decisions.md). Commands run from the repo root on Linux, Python 3.11.
 
 ## 0. Environment
 
@@ -14,7 +14,7 @@ pip install -e .
 - Package versions used: mlflow 2.22.5, lightgbm 4.5.0, evidently 0.4.40, pandas 2.3.3,
   numpy 1.26.4, scikit-learn 1.9.1, SQLAlchemy 2.0.x.
 - Before the pin in step 7, the install pulled SQLAlchemy 2.1.1 and `import mlflow`
-  crashed (`ImportError: FallbackAsyncAdaptedQueuePool`). See `decisions.md` D7.
+  crashed (`ImportError: FallbackAsyncAdaptedQueuePool`). See [`decisions.md`](decisions.md) D-7.
 
 ## 1. Get the real data
 
@@ -37,7 +37,7 @@ MLFLOW_TRACKING_URI=sqlite:///mlflow.db \
 
 - Result: `val_rmse 18.90`, gate (`max_rmse 35`) passed, registered as `cmapss_rul` v1.
 - Loading that model and calling it with `config/serving.yaml`'s columns failed MLflow's
-  schema check (`_roll_mean_10` vs `_roll_mean_20`). Fixed in commit `a4fffd4` (D2).
+  schema check (`_roll_mean_10` vs `_roll_mean_20`). Fixed in commit `a4fffd4` (D-2).
   After the fix, the same call returned a prediction.
 
 ## 3. Benchmark the model and the drift check
@@ -68,7 +68,7 @@ python scripts/calibrate_drift.py --raw-dir data/raw
 - The script at that commit set a per-column threshold of 0.47.
 - False alarms on 40 unseen engines: 0% (large fleet), 4.5% (5-engine fleet).
 - Still left: ageing fleets tripped retraining 100%, and single broken sensors were
-  never caught. These led to D4 and D5.
+  never caught. These led to D-4 and D-5.
 
 ## 5. Compare reference strategies and sensor checks
 
@@ -86,7 +86,7 @@ Outcome:
   caught FD003.
 - The residual check caught one broken sensor at 0.5 std and a stuck sensor 100% of the
   time.
-- Tables in `decisions.md` D4 and D5.
+- Tables in [`decisions.md`](decisions.md) D-4 and D-5.
 
 ## 6. Build the two checks and re-calibrate
 
@@ -138,7 +138,7 @@ python scripts/benchmark_real_data.py --raw-dir data/raw
 - Cause: that window took the last 500 rows sorted by engine, so it really held only 2-3
   engines.
 - Fix: the benchmark now draws from exactly k engines. The window-size sweep that
-  followed is in `decisions.md` D8 (needs about 5+ engines per window).
+  followed is in [`decisions.md`](decisions.md) D-8 (needs about 5+ engines per window).
 
 Final drift rows in `reports/benchmark_cmapss.json` (original check → final check):
 
@@ -161,7 +161,7 @@ python -m pytest -q
 
 - New tests: `tests/unit/test_config_consistency.py`, `tests/unit/test_drift_checks.py`,
   and an added case in `tests/unit/test_drift.py`.
-- One test fails before and after these changes (Linux path issue, `decisions.md` D10):
+- One test fails before and after these changes (Linux path issue, [`decisions.md`](decisions.md) D-10):
   `tests/unit/test_config.py::test_set_experiment_with_artifact_root_none_uses_mlflow_default`.
 
 ## 10. Phase 2A: intervals, decision cost, champion/challenger gate
@@ -180,13 +180,13 @@ python -m pdm.training.retrain --raw-dir data/raw        # train + gate in one s
 | v3 | 42 | 22.7 | 91% / 65 | 12.68 | 0 | 9 | **rejected** vs v2 (cost 12.68 > limit 12.30) |
 
 - The first interval attempt used LightGBM quantile models. The upper bound came out as
-  exactly 125 on every row (D12), so the bounds were switched to scikit-learn.
+  exactly 125 on every row (D-12), so the bounds were switched to scikit-learn.
 - Tests: 110 passed, plus the one failure that predates these changes.
 
 ## 11. Phase 2B: engine IDs, input validation, drift-window rules
 
 No new measurements. The window-size numbers behind `min_engines: 5` are in section 8
-and D8. Checked by tests:
+and D-8. Checked by tests:
 
 - `tests/unit/test_serving_api.py`: 422 without `asset_id` and for NaN values;
   out-of-range values flagged but still predicted; `asset_id`, `cycle`, `observed_at`
@@ -208,3 +208,43 @@ INFERENCE_LOG_DB=... python -m pdm.drift.run_drift_check --dry-run
 
 Output: `Drift reference: cmapss_rul v1 (run ...) (16679 rows)`, then
 `action=none engines=20 share_of_drifted_columns=0.0`. Peak memory 377 MiB.
+
+## 13. Phase 2D/E: outcome labels, the FD003 loop, fault-vs-shift diagnosis
+
+```bash
+# fresh store: train v1, promote it after human confirmation, then run the loop
+export MLFLOW_TRACKING_URI=sqlite:///loop/mlflow.db INFERENCE_LOG_DB=loop/log.db \
+       OUTCOME_DB=loop/outcomes.db LABELS_DIR=loop/labels
+python -m pdm.training.train --raw-dir data/raw
+python -m pdm.evaluation.champion_challenger --candidate-version 1 --promote --confirm-bootstrap
+python scripts/label_loop_demo.py --raw-dir data/raw --json-out reports/label_loop_fd003.json
+```
+
+Replay: 13,167 requests through the real API (0 rejected), 60 FD003 engines (38 failed,
+15 maintained, 7 still running). The replay takes about 70 ms per request, most of it
+model-prediction overhead (D-12).
+
+| Step | First run (before D-21) | Re-run (after D-21) |
+|---|---|---|
+| Drift check | share 0.86, **14 sensors flagged**, action `hold_for_sensor_fault` | share 0.86, verdict `system_wide_shift`, action **`retrain`** |
+| Outcome import | 53 added | 53 added |
+| Labels | 10,584 rows (9,899 failure, 685 capped-maintenance), 1,781 dropped as too close to maintenance | same |
+| Gate (FD001 data) | approved: cost 12.24 vs 12.68, RMSE 22.30 vs 22.66, coverage 84% | same |
+
+40 FD003 engines never replayed:
+
+| | Before (v1) | After (v2) |
+|---|---|---|
+| Unplanned failures | 15 (7 missed, 8 late) | 0 |
+| Cost per engine | 45.2 | 11.8 |
+| RMSE, all cycles | 22.5 | 19.8 |
+| RMSE, last 60 cycles | 29.0 | 21.4 |
+| Wasted cycles per maintained engine | 23.0 | 18.4 |
+
+Fault-vs-shift check (D-21), on FD001 holdout windows: removing the top sensor left 0
+sensors flagged for every one-sensor fault (0.5-3 std offset, stuck), and 12-13 flagged
+for FD003/FD002. Two-sensor faults were named correctly 29/30; FD003 was called a
+system-wide shift 30/30; normal traffic "ok" 30/30.
+
+End-to-end test (D-22): `pytest tests/integration/test_end_to_end_loop.py`, 2 passed in
+about 74 s.

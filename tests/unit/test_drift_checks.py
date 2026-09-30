@@ -87,6 +87,7 @@ def test_evaluate_window_matches_life_stage_when_predictions_present(reference):
     assert matched["drift"]["share_of_drifted_columns"] == 0.0
     assert plain["drift"]["share_of_drifted_columns"] == 1.0
     assert matched["sensor_scores"] == {} and matched["faulty_sensors"] == []
+    assert matched["sensor_verdict"] is None
 
 
 def test_evaluate_window_falls_back_without_predictions(reference):
@@ -109,3 +110,21 @@ def test_add_oof_predictions_and_seeded_reference(raw_data_dir: Path):
     cols = [c for c in features.columns if c not in ("unit_number", "time_in_cycles", "rul")]
     again = add_oof_predictions(features, cols, training_cfg["model"])
     np.testing.assert_allclose(again["predicted_rul"], reference["predicted_rul"])
+
+
+def test_diagnose_single_sensor_fault_vs_system_wide_shift(reference):
+    from pdm.drift.sensor_check import diagnose
+
+    window = reference.sample(500, random_state=4).copy()
+    assert diagnose(reference, window, COLUMNS, threshold=0.5)["verdict"] == "ok"
+
+    broken = window.copy()
+    broken["s2"] = broken["s2"] + 2 * reference["s2"].std()
+    result = diagnose(reference, broken, COLUMNS, threshold=0.5)
+    assert result["verdict"] == "sensor_fault" and result["culprits"] == ["s2"]
+
+    # every sensor's relationship to the others changes: not a sensor fault
+    shifted = window.copy()
+    for i, col in enumerate(COLUMNS):
+        shifted[col] = shifted[col] * (1 + 0.8 * (i % 2)) + i
+    assert diagnose(reference, shifted, COLUMNS, threshold=0.5)["verdict"] == "system_wide_shift"

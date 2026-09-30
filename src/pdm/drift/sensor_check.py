@@ -13,6 +13,16 @@ time with ~0-2% false alarms on normal and ageing fleets.
 
 A fired sensor alert means "inspect this sensor", NOT "retrain": retraining on data from
 a broken sensor would bake the fault into the model.
+
+Telling a broken sensor from a fleet-wide shift (diagnose): a broken sensor also shifts
+the residuals of every sensor that uses it as a predictor, so a large offset can flag
+most of the 14 sensors - and so does a real fleet-wide shift (a new fault mode flags
+13-14). Counting flagged sensors cannot separate them. Removing the top-scoring sensor
+and re-scoring the rest can: on FD001, after removing it, 0 sensors stay flagged for
+every single-sensor offset (0.5-3 std) and stuck sensor tested, and 12-13 stay flagged
+for the FD003/FD002 fleet shifts. So a fault is reported only when removing at most
+`max_culprits` sensors explains every flag; otherwise it is a system-wide shift, which is
+the retrain check's job, not a sensor alert.
 """
 
 from __future__ import annotations
@@ -63,3 +73,33 @@ def faulty_sensors(scores: dict[str, float], threshold: float) -> list[str]:
     likely culprit (see scripts/calibrate_drift.py for how often it is right).
     """
     return sorted((c for c, s in scores.items() if s > threshold), key=lambda c: -scores[c])
+
+
+def diagnose(
+    reference: pd.DataFrame,
+    current: pd.DataFrame,
+    columns: list[str],
+    threshold: float,
+    max_culprits: int = 2,
+) -> dict:
+    """Returns {"verdict", "culprits", "scores"}. verdict is:
+    - "ok": no sensor over threshold;
+    - "sensor_fault": removing the `culprits` (at most max_culprits, worst first)
+      leaves no other sensor flagged;
+    - "system_wide_shift": it does not - the whole relationship between sensors changed.
+    `scores` are the first-pass per-sensor scores (all columns)."""
+    scores = sensor_fault_scores(reference, current, columns)
+    if not faulty_sensors(scores, threshold):
+        return {"verdict": "ok", "culprits": [], "scores": scores}
+    culprits: list[str] = []
+    remaining, current_scores = list(columns), scores
+    for _ in range(max_culprits):
+        top = max(current_scores, key=current_scores.get)
+        culprits.append(top)
+        remaining = [c for c in remaining if c != top]
+        if len(remaining) < 2:
+            break
+        current_scores = sensor_fault_scores(reference, current, remaining)
+        if not faulty_sensors(current_scores, threshold):
+            return {"verdict": "sensor_fault", "culprits": culprits, "scores": scores}
+    return {"verdict": "system_wide_shift", "culprits": [], "scores": scores}

@@ -295,7 +295,7 @@ conditions, a new fault mode, a fleet change.
    - A rejection is normal and safe: Production is unchanged.
    - If it's rejected repeatedly while drift stays high, the model can't adapt with the
      data it has. Escalate: new labelled data or a model change is needed (see
-     `decisions.md` D14 on gate noise).
+     `docs/decisions.md` D-14 on gate noise).
 
 ### SensorFaultSuspected
 
@@ -326,7 +326,7 @@ retrain Job was created (`sensor_check.hold_retrain_on_fault`).
 - `skip_no_data`: no traffic.
 - `skip_too_few_engines`: fewer than `current_window.min_engines` engines in the window
   (`pdm_drift_window_engines`). With fewer than 5 engines the checks are wrong 15-94%
-  of the time (`decisions.md` D8).
+  of the time (`docs/decisions.md` D-8).
 
 **Do.**
 1. Confirm traffic: `pdm_predictions_total` rate.
@@ -375,5 +375,39 @@ for example `cost_per_engine: challenger 12.675 vs champion 11.715 (limit 12.301
 - **First promotion ever:** always rejected until a human reviews the scores and runs
   `python -m pdm.evaluation.champion_challenger --candidate-version N --promote --confirm-bootstrap`.
 - **Known noise:** changing only the random seed moves holdout cost by about 8%, more
-  than the 5% tolerance (`decisions.md` D14). One rejection on cost alone is not
+  than the 5% tolerance (`docs/decisions.md` D-14). One rejection on cost alone is not
   evidence the candidate is worse.
+
+## Recording outcomes (the source of new training labels)
+
+Retraining only improves the model if it gets new, true outcomes. The retrain job builds
+labels from two things:
+- the inference log (what the model saw, per `asset_id` and `cycle`), and
+- the outcome store (what actually happened).
+
+Nothing fills the outcome store automatically. Someone has to own this.
+
+**What to record, per engine.**
+- `failure` at the cycle it failed.
+- `maintenance` at the cycle it was overhauled or replaced *before* failing.
+
+Use the same `asset_id` and cycle count that clients send to `/predict`.
+
+**How.** Export from the maintenance system (CMMS) as a CSV with the columns
+`asset_id,event_type,cycle`, then:
+
+```bash
+python -m pdm.labels.outcomes import --csv cmms_export.csv    # safe to re-import
+python -m pdm.labels.outcomes list
+python -m pdm.labels.build                                    # optional: preview labels + counts
+```
+
+In the cluster, run the same commands in a pod with `/data` (the `pdm-mlflow-data`
+volume) mounted and `OUTCOME_DB=/data/outcomes/outcomes.db`.
+
+**Reading `python -m pdm.labels.build` counts.**
+- `dropped_no_outcome_yet`: engines still running. Normal.
+- `dropped_censored_below_cap`: readings within 125 cycles of a maintenance. Their true
+  label is unknown, so they are dropped on purpose.
+- `dropped_no_asset_or_cycle`: clients aren't sending `cycle`. **Fix the client**; those
+  readings can never become labels.

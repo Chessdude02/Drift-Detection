@@ -1,7 +1,8 @@
 """Retrain entrypoint used by the pdm-retrain CronJob and by drift-triggered Jobs:
-train a candidate, then let the champion/challenger gate decide whether it replaces
-Production. A candidate that fails the gate stays registered (for inspection) but is
-never promoted; Production is untouched.
+rebuild outcome labels (pdm.labels.build), train a candidate on base data + those labels,
+then let the champion/challenger gate decide whether it replaces Production. A candidate
+that fails the gate stays registered (for inspection) but is never promoted; Production
+is untouched.
 
 Exit code: 0 if the candidate was promoted or correctly rejected by the gate, 1 if
 training itself failed. A rejection is a normal outcome, not a job failure - the gate's
@@ -19,18 +20,39 @@ import logging
 import sys
 from pathlib import Path
 
-from pdm.common.config import configure_mlflow_env, load_yaml
+from pdm.common.config import configure_mlflow_env, get_settings, load_yaml
 from pdm.common.logging import setup_logging
+from pdm.data.features import feature_columns
 from pdm.evaluation.champion_challenger import run_gate
+from pdm.labels.build import build_and_write
 from pdm.training.train import run_training
 
 logger = logging.getLogger(__name__)
 
 
+def refresh_labels(config: dict) -> dict | None:
+    """Rebuilds the outcome-label dataset from the inference log and the outcome store,
+    so each retrain sees every failure/maintenance recorded so far."""
+    labels_cfg = config.get("labels", {})
+    if not labels_cfg.get("enabled"):
+        return None
+    settings = get_settings()
+    features = config["features"]
+    cols = feature_columns(features["sensor_columns"], max(features["rolling_windows"]))
+    return build_and_write(
+        settings.inference_log_db,
+        settings.outcome_db,
+        Path(labels_cfg.get("dir") or settings.labels_dir),
+        cols,
+        config["dataset"]["rul_cap"],
+    )
+
+
 def retrain(raw_dir: Path, config: dict, promote: bool = True, extra_tags=None) -> dict:
+    labels = refresh_labels(config)
     trained = run_training(raw_dir, config, register=True, extra_tags=extra_tags)
     gate = run_gate(trained["model_version"], raw_dir, config, promote=promote)
-    return {"training": trained, "gate": gate}
+    return {"labels": labels, "training": trained, "gate": gate}
 
 
 def main() -> int:

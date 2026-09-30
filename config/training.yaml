@@ -51,6 +51,13 @@ decision_config: decision.yaml
 drift_reference:
   enabled: true
 
+# New training rows from real outcomes: failures/maintenance (pdm.labels.outcomes)
+# joined with logged predictions (pdm.labels.build). pdm.training.retrain rebuilds them
+# before every retrain. dir: null = Settings.labels_dir (env LABELS_DIR).
+labels:
+  enabled: true
+  dir: null
+
 mlflow:
   experiment_name: cmapss_rul
   registered_model_name: cmapss_rul

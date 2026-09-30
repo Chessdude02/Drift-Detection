@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import sys
@@ -17,13 +18,20 @@ import tempfile
 from pathlib import Path
 
 import mlflow
+import pandas as pd
 
-from pdm.common.config import configure_mlflow_env, load_yaml, set_experiment_with_artifact_root
+from pdm.common.config import (
+    configure_mlflow_env,
+    get_settings,
+    load_yaml,
+    set_experiment_with_artifact_root,
+)
 from pdm.common.logging import setup_logging
 from pdm.data.datasets import get_adapter
 from pdm.drift.life_stage import add_oof_predictions
 from pdm.drift.reference import DRIFT_REFERENCE_ARTIFACT_DIR, DRIFT_REFERENCE_FILE
 from pdm.evaluation.decision import choose_threshold, threshold_grid
+from pdm.labels.build import load_label_dataset
 from pdm.training.evaluate import passes_validation_gate, rmse
 from pdm.training.rul_model import RULIntervalModel, RULPyfunc
 
@@ -63,8 +71,16 @@ def run_training(
 
     feature_df, cols = adapter["load"](raw_dir, dataset_cfg, features_cfg)
     if model_cfg.get("intervals", {}).get("enabled") or config.get("decision_config"):
+        feature_df, data_manifest = add_outcome_labels(feature_df, cols, config)
+        data_manifest["base"] = base_data_manifest(raw_dir, dataset_cfg, feature_df)
         return _run_bundle_training(
-            feature_df, cols, config, adapter, register=register, extra_tags=extra_tags
+            feature_df,
+            cols,
+            config,
+            adapter,
+            register=register,
+            extra_tags=extra_tags,
+            data_manifest=data_manifest,
         )
     random_state = model_cfg["params"].get("random_state", 42)
     train_idx, val_idx = adapter["split"](feature_df, model_cfg["val_split"], random_state)
@@ -165,9 +181,13 @@ def fit_bundle(feature_df, cols: list[str], config: dict, split_fn) -> dict:
     decision = None
     if config.get("decision_config"):
         decision_cfg = load_yaml(config["decision_config"])
+        # Only engine lives whose failure cycle is known can score a maintenance
+        # decision; censored (maintained) lives have no true_rul.
+        complete = val_df.groupby("unit_number")["true_rul"].transform(lambda s: s.notna().all())
+        scored = val_df[complete]
         decision = choose_threshold(
-            val_df,
-            bundle.decision_signal(val_df[cols]),
+            scored,
+            bundle.decision_signal(scored[cols]),
             threshold_grid(decision_cfg),
             decision_cfg["lead_time_cycles"],
             decision_cfg["costs"],
@@ -184,7 +204,53 @@ def fit_bundle(feature_df, cols: list[str], config: dict, split_fn) -> dict:
     return {"bundle": bundle, "train_df": train_df, "val_df": val_df, "metrics": metrics}
 
 
-def _run_bundle_training(feature_df, cols, config, adapter, register, extra_tags) -> dict:
+def add_outcome_labels(feature_df, cols: list[str], config: dict):
+    """Appends the label dataset built from real outcomes (pdm.labels.build) when
+    `labels.enabled`. Returns (training rows, manifest describing the labels used)."""
+    labels_cfg = config.get("labels", {})
+    if not labels_cfg.get("enabled"):
+        return feature_df, {"labels": None}
+    label_dir = Path(labels_cfg.get("dir") or get_settings().labels_dir)
+    labels, manifest = load_label_dataset(label_dir, cols)
+    if labels.empty:
+        logger.info("No outcome labels in %s yet; training on base data only", label_dir)
+        return feature_df, {"labels": {"dir": str(label_dir), "rows": 0}}
+    keep = ["unit_number", "time_in_cycles", *cols, "rul", "true_rul"]
+    merged = pd.concat([feature_df, labels[keep]], ignore_index=True)
+    logger.info(
+        "Added %d outcome-label rows (%d engine lives) from %s",
+        len(labels),
+        labels["unit_number"].nunique(),
+        label_dir,
+    )
+    return merged, {
+        "labels": {
+            "dir": str(label_dir),
+            "rows": len(labels),
+            "engine_lives": int(labels["unit_number"].nunique()),
+            "sha256": manifest.get("sha256"),
+            "built_at": manifest.get("built_at"),
+            "stats": manifest.get("stats"),
+        }
+    }
+
+
+def base_data_manifest(raw_dir, dataset_cfg: dict, feature_df) -> dict:
+    """Which base data this model saw: raw file hash, holdout file, row/engine counts."""
+    manifest = {"rows_total_including_labels": len(feature_df)}
+    subset = dataset_cfg.get("subset")
+    raw_file = Path(raw_dir) / f"train_{subset}.txt"
+    if subset and raw_file.exists():
+        manifest["raw_file"] = raw_file.name
+        manifest["raw_sha256"] = hashlib.sha256(raw_file.read_bytes()).hexdigest()
+    if dataset_cfg.get("holdout_units_file"):
+        manifest["holdout_units_file"] = dataset_cfg["holdout_units_file"]
+    return manifest
+
+
+def _run_bundle_training(
+    feature_df, cols, config, adapter, register, extra_tags, data_manifest=None
+) -> dict:
     dataset_cfg, model_cfg = config["dataset"], config["model"]
     mlflow_cfg, eval_cfg = config["mlflow"], config["evaluation"]
     fitted = fit_bundle(feature_df, cols, config, adapter["split"])
@@ -203,6 +269,13 @@ def _run_bundle_training(feature_df, cols, config, adapter, register, extra_tags
             mlflow.log_param("interval_coverage_target", model_cfg["intervals"]["coverage"])
         mlflow.log_param("n_train_engines", int(train_df["unit_number"].nunique()))
         mlflow.log_metrics(metrics)
+        if data_manifest:
+            # Exactly which data this model saw, so any version can be reproduced.
+            mlflow.log_dict(data_manifest, "data_manifest.json")
+            labels = data_manifest.get("labels") or {}
+            mlflow.log_param("outcome_label_rows", labels.get("rows", 0))
+            if labels.get("sha256"):
+                mlflow.log_param("outcome_labels_sha256", labels["sha256"])
 
         sample = train_df[cols].head(50)
         model_info = mlflow.pyfunc.log_model(

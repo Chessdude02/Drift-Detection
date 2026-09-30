@@ -29,7 +29,7 @@ from pdm.common.config import get_settings, load_yaml
 from pdm.common.logging import setup_logging
 from pdm.drift.life_stage import REFERENCE_PREDICTION_COLUMN, match_life_stage
 from pdm.drift.reference import load_reference
-from pdm.drift.sensor_check import faulty_sensors, sensor_fault_scores
+from pdm.drift.sensor_check import diagnose
 from pdm.serving.inference_log import InferenceLog
 
 logger = logging.getLogger(__name__)
@@ -113,9 +113,20 @@ def evaluate_window(
 
     scores: dict[str, float] = {}
     flagged: list[str] = []
+    verdict = None
     if sensor_cfg.get("enabled"):
-        scores = sensor_fault_scores(reference_df, current_df, columns)
-        flagged = faulty_sensors(scores, sensor_cfg["threshold"])
+        diagnosis = diagnose(
+            reference_df,
+            current_df,
+            columns,
+            sensor_cfg["threshold"],
+            max_culprits=sensor_cfg.get("max_culprits", 2),
+        )
+        scores, flagged, verdict = (
+            diagnosis["scores"],
+            diagnosis["culprits"],
+            diagnosis["verdict"],
+        )
 
     return {
         "drift": drift,
@@ -123,6 +134,7 @@ def evaluate_window(
         "life_stage_coverage": coverage,
         "sensor_scores": scores,
         "faulty_sensors": flagged,
+        "sensor_verdict": verdict,
     }
 
 
@@ -199,7 +211,7 @@ def decide_action(
 ) -> str:
     """What the drift job should do. Pure, so the policy is testable:
     - skip_too_few_engines: under current_window.min_engines, both checks give 15-60%
-      false alarms (decisions.md D8), so no decision is made at all.
+      false alarms (docs/decisions.md D-8), so no decision is made at all.
     - hold_for_sensor_fault: drift says retrain, but a sensor also looks broken.
       Retraining on a broken sensor's data would bake the fault in; a human decides.
     """

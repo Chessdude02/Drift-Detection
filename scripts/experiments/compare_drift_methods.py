@@ -1,4 +1,4 @@
-"""One-off experiment behind decisions.md D4/D5: which reference strategy should the
+"""One-off experiment behind docs/decisions.md D-4/D-5: which reference strategy should the
 retrain trigger use, and which per-sensor check should the sensor-fault alert use?
 
 Compared on real FD001 (5 folds of 20 engines; thresholds set at the 99th percentile of

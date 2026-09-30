@@ -14,7 +14,7 @@ current_window:
   lookback_hours: 24
   lookback_rows: 500
   # Fewer distinct engines than this and the check is skipped: with 1-3 engines both
-  # checks give 15-94% false alarms (decisions.md D8). Needs asset_id on requests.
+  # checks give 15-94% false alarms (docs/decisions.md D-8). Needs asset_id on requests.
   min_engines: 5
 
 drift:
@@ -61,6 +61,11 @@ life_stage_matching:
 sensor_check:
   enabled: true
   threshold: 0.46
+  # A fault is reported only if removing at most this many sensors explains every flag;
+  # otherwise the whole fleet shifted (sensor_verdict: system_wide_shift) and it is the
+  # retrain check's call. Without this, a new fault mode (FD003) flagged all 14 sensors
+  # and wrongly held its retrain as a "sensor fault" (docs/decisions.md D-21).
+  max_culprits: 2
   # When drift says "retrain" but a sensor also looks faulty, hold the retrain for a
   # human instead (a broken sensor tripped the retrain check up to 9% of the time).
   hold_retrain_on_fault: true
