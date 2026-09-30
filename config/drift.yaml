@@ -9,21 +9,28 @@ current_window:
 
 drift:
   threshold: 0.5                 # share of drifted columns (Evidently DataDriftPreset) that triggers retrain
+  # Per-column test. Evidently's default (normed Wasserstein, 0.1) flags 90%+ of windows
+  # of unseen but normal FD001 engines, because engine-to-engine variation alone exceeds
+  # 0.1. 0.47 is the 99th percentile of normal windows on real FD001 data; re-run
+  # scripts/calibrate_drift.py (results: reports/drift_calibration.json) if the
+  # features, window size or reference data change.
+  stattest: wasserstein
+  stattest_threshold: 0.47
   columns:
-    - sensor_2_roll_mean_10
-    - sensor_3_roll_mean_10
-    - sensor_4_roll_mean_10
-    - sensor_7_roll_mean_10
-    - sensor_8_roll_mean_10
-    - sensor_9_roll_mean_10
-    - sensor_11_roll_mean_10
-    - sensor_12_roll_mean_10
-    - sensor_13_roll_mean_10
-    - sensor_14_roll_mean_10
-    - sensor_15_roll_mean_10
-    - sensor_17_roll_mean_10
-    - sensor_20_roll_mean_10
-    - sensor_21_roll_mean_10
+    - sensor_2_roll_mean_20
+    - sensor_3_roll_mean_20
+    - sensor_4_roll_mean_20
+    - sensor_7_roll_mean_20
+    - sensor_8_roll_mean_20
+    - sensor_9_roll_mean_20
+    - sensor_11_roll_mean_20
+    - sensor_12_roll_mean_20
+    - sensor_13_roll_mean_20
+    - sensor_14_roll_mean_20
+    - sensor_15_roll_mean_20
+    - sensor_17_roll_mean_20
+    - sensor_20_roll_mean_20
+    - sensor_21_roll_mean_20
 
 retrain_trigger:
   namespace: pdm

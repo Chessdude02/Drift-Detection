@@ -104,6 +104,63 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 ./scripts/rollback.ps1 undo    # revert to the previous stable revision
 ```
 
+## Measured results (real NASA C-MAPSS data)
+
+Reproduce with `python scripts/benchmark_real_data.py --raw-dir data/raw` (needs all four
+subsets in `data/raw/`); raw numbers are in `reports/benchmark_cmapss.json`. Model =
+the pipeline in `config/training.yaml` unchanged, mean ± std over 5 seeds.
+
+**RUL model, scored on the official NASA test set** (last cycle of every test engine vs
+`RUL_FD00x.txt`, true RUL capped at 125, same as training):
+
+| Subset | Test engines | Test RMSE | Test MAE | NASA score (lower = better) | Baseline RMSE (predict mean) | Internal val RMSE |
+|---|---|---|---|---|---|---|
+| FD001 | 100 | 22.3 ± 0.8 | 16.0 | 3,654 | 42.0 | 21.3 ± 2.6 |
+| FD002 | 259 | 21.4 ± 0.2 | 16.5 | 5,576 | 45.0 | 21.4 ± 1.0 |
+| FD003 | 100 | 21.7 ± 0.7 | 15.9 | 2,132 | 43.6 | 19.6 ± 2.2 |
+| FD004 | 248 | 24.0 ± 0.5 | 18.7 | 6,860 | 45.6 | 21.9 ± 1.7 |
+
+- The model roughly halves the error of a naive baseline, but it is well short of
+  published C-MAPSS results (roughly 12-18 RMSE on FD001). It passes the
+  `max_rmse: 35.0` gate by a wide margin, so that gate does not separate a good model
+  from a mediocre one.
+- The single-split val RMSE that `train.py` logs (18.9 on FD001 with seed 42) is on the
+  lucky side of its own ±2.6 spread; don't quote it as the model's accuracy.
+
+**Drift detector** (`compute_drift_score` with `config/drift.yaml`: 500-row windows,
+retrain when > 50% of columns drift; reference = 80 FD001 training engines; 20 windows
+per scenario). "Default" = Evidently's own per-column test (normed Wasserstein, 0.1);
+"calibrated" = the `stattest_threshold: 0.47` now in `config/drift.yaml`.
+
+| Scenario | Real shift? | Retrain triggered (default) | Retrain triggered (calibrated) |
+|---|---|---|---|
+| Rows from the reference engines themselves | No | 0% | 0% |
+| Random rows from 20 unseen FD001 engines | No | 90% | 0% |
+| 5 unseen FD001 engines (small fleet) | No | 100% | 5% |
+| FD001 official test set | No (engines earlier in life) | 100% | 100% |
+| Unseen FD001 engines near failure (RUL ≤ 30) | Normal wear | 100% | 100% |
+| FD003 (new fault mode) | Yes | 100% | 100% |
+| FD002 (six operating conditions) | Yes | 100% | 100% |
+
+- With the default test, engines differ from each other more than 0.1 allows, so almost
+  any window of *new* engines looks like drift and the retrain job would fire on nearly
+  every check.
+- `scripts/calibrate_drift.py` picks the threshold from normal windows on 60 FD001
+  engines and checks it on 40 engines it never saw (`reports/drift_calibration.json`):
+  false alarms 0% (large fleet) / 4.5% (5-engine fleet); detection 100% for FD002,
+  99.5% for FD003, 100% for a 1-std offset on all sensors, 89% at 0.5 std, 0% at
+  0.25 std.
+
+What the calibrated check still gets wrong:
+
+- **A single faulty sensor is invisible.** An offset on 3 of the 14 sensors is never
+  detected, even at 2 std, because retraining needs more than half the columns to drift.
+- **Normal ageing looks like drift.** The reference is built from engines run all the way
+  to failure, while a live fleet is mostly mid-life (like the official test set, which
+  triggers 100% of the time). A fleet that gets younger or older on average will trigger
+  a retrain. Fixing this needs a reference that matches the fleet's life-stage mix, not
+  a different threshold.
+
 ## Notes and known limitations
 
 - **Shadow traffic** is mirrored via an NGINX Ingress annotation, which is inherently
