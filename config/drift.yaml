@@ -10,20 +10,20 @@ current_window:
 drift:
   threshold: 0.5                 # share of drifted columns (Evidently DataDriftPreset) that triggers retrain
   columns:
-    - sensor_2_roll_mean_10
-    - sensor_3_roll_mean_10
-    - sensor_4_roll_mean_10
-    - sensor_7_roll_mean_10
-    - sensor_8_roll_mean_10
-    - sensor_9_roll_mean_10
-    - sensor_11_roll_mean_10
-    - sensor_12_roll_mean_10
-    - sensor_13_roll_mean_10
-    - sensor_14_roll_mean_10
-    - sensor_15_roll_mean_10
-    - sensor_17_roll_mean_10
-    - sensor_20_roll_mean_10
-    - sensor_21_roll_mean_10
+    - sensor_2_roll_mean_20
+    - sensor_3_roll_mean_20
+    - sensor_4_roll_mean_20
+    - sensor_7_roll_mean_20
+    - sensor_8_roll_mean_20
+    - sensor_9_roll_mean_20
+    - sensor_11_roll_mean_20
+    - sensor_12_roll_mean_20
+    - sensor_13_roll_mean_20
+    - sensor_14_roll_mean_20
+    - sensor_15_roll_mean_20
+    - sensor_17_roll_mean_20
+    - sensor_20_roll_mean_20
+    - sensor_21_roll_mean_20
 
 retrain_trigger:
   namespace: pdm
