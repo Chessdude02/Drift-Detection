@@ -9,13 +9,14 @@ current_window:
 
 drift:
   threshold: 0.5                 # share of drifted columns (Evidently DataDriftPreset) that triggers retrain
-  # Per-column test. Evidently's default (normed Wasserstein, 0.1) flags 90%+ of windows
-  # of unseen but normal FD001 engines, because engine-to-engine variation alone exceeds
-  # 0.1. 0.47 is the 99th percentile of normal windows on real FD001 data; re-run
+  # Per-column test, applied against the life-stage-matched reference below. Evidently's
+  # default (normed Wasserstein, 0.1) flags 90%+ of windows of unseen but normal FD001
+  # engines, because engine-to-engine variation alone exceeds 0.1. The threshold is the
+  # 99th percentile of normal windows on real FD001 data; re-run
   # scripts/calibrate_drift.py (results: reports/drift_calibration.json) if the
-  # features, window size or reference data change.
+  # features, window size, model or reference data change.
   stattest: wasserstein
-  stattest_threshold: 0.47
+  stattest_threshold: 0.32
   columns:
     - sensor_2_roll_mean_20
     - sensor_3_roll_mean_20
@@ -31,6 +32,25 @@ drift:
     - sensor_17_roll_mean_20
     - sensor_20_roll_mean_20
     - sensor_21_roll_mean_20
+
+# Resample the reference to the current window's predicted-RUL mix before the retrain
+# check, so a fleet that is younger or older than the reference is not flagged as drift.
+# Needs the reference's `predicted_rul` column (scripts/seed_reference_data.py) and the
+# inference log's logged predictions. See src/pdm/drift/life_stage.py.
+life_stage_matching:
+  enabled: true
+  bin_width: 10                  # predicted-RUL bin width, cycles
+  max_rul: 130                   # last bin edge; everything above falls in one bin (RUL cap is 125)
+  sample_rows: 5000              # size of the resampled reference
+  seed: 0
+
+# Per-sensor residual check (src/pdm/drift/sensor_check.py). Raises the SensorFaultSuspected
+# alert via the pdm_sensor_fault gauge; never triggers retraining. The threshold is the
+# 99th percentile, over normal windows, of the largest per-sensor score in the window;
+# recalibrate with scripts/calibrate_drift.py.
+sensor_check:
+  enabled: true
+  threshold: 0.46
 
 retrain_trigger:
   namespace: pdm

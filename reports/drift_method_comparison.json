@@ -1,0 +1,138 @@
+{
+ "full|share>0.5": {
+  "threshold": 0.447,
+  "fire_rate_heldout": {
+   "A_fd001_official_test": 0.86,
+   "A_old_fleet_rul_le_30": 1.0,
+   "A_young_fleet_truncated": 0.66,
+   "D_fd002": 1.0,
+   "D_fd003": 1.0,
+   "N_small_fleet_5_engines": 0.09,
+   "N_steady_fleet": 0.0,
+   "S_one_sensor_offset_0.5std": 0.0,
+   "S_one_sensor_offset_1std": 0.0,
+   "S_one_sensor_offset_2std": 0.0,
+   "S_one_sensor_offset_3std": 0.0,
+   "S_one_sensor_stuck": 0.0
+  }
+ },
+ "full|any_column": {
+  "threshold": 0.696,
+  "fire_rate_heldout": {
+   "A_fd001_official_test": 0.0,
+   "A_old_fleet_rul_le_30": 1.0,
+   "A_young_fleet_truncated": 0.015,
+   "D_fd002": 1.0,
+   "D_fd003": 1.0,
+   "N_small_fleet_5_engines": 0.055,
+   "N_steady_fleet": 0.0,
+   "S_one_sensor_offset_0.5std": 0.005,
+   "S_one_sensor_offset_1std": 1.0,
+   "S_one_sensor_offset_2std": 1.0,
+   "S_one_sensor_offset_3std": 1.0,
+   "S_one_sensor_stuck": 0.86
+  }
+ },
+ "mid|share>0.5": {
+  "threshold": 1.354,
+  "fire_rate_heldout": {
+   "A_fd001_official_test": 0.0,
+   "A_old_fleet_rul_le_30": 1.0,
+   "A_young_fleet_truncated": 0.0,
+   "D_fd002": 1.0,
+   "D_fd003": 0.0,
+   "N_small_fleet_5_engines": 0.03,
+   "N_steady_fleet": 0.0,
+   "S_one_sensor_offset_0.5std": 0.0,
+   "S_one_sensor_offset_1std": 0.0,
+   "S_one_sensor_offset_2std": 0.0,
+   "S_one_sensor_offset_3std": 0.0,
+   "S_one_sensor_stuck": 0.0
+  }
+ },
+ "mid|any_column": {
+  "threshold": 1.722,
+  "fire_rate_heldout": {
+   "A_fd001_official_test": 0.0,
+   "A_old_fleet_rul_le_30": 1.0,
+   "A_young_fleet_truncated": 0.0,
+   "D_fd002": 1.0,
+   "D_fd003": 1.0,
+   "N_small_fleet_5_engines": 0.02,
+   "N_steady_fleet": 0.0,
+   "S_one_sensor_offset_0.5std": 0.005,
+   "S_one_sensor_offset_1std": 0.655,
+   "S_one_sensor_offset_2std": 1.0,
+   "S_one_sensor_offset_3std": 1.0,
+   "S_one_sensor_stuck": 0.0
+  }
+ },
+ "matched|share>0.5": {
+  "threshold": 0.315,
+  "fire_rate_heldout": {
+   "A_fd001_official_test": 0.0,
+   "A_old_fleet_rul_le_30": 0.0,
+   "A_young_fleet_truncated": 0.005,
+   "D_fd002": 1.0,
+   "D_fd003": 1.0,
+   "N_small_fleet_5_engines": 0.05,
+   "N_steady_fleet": 0.0,
+   "S_one_sensor_offset_0.5std": 0.0,
+   "S_one_sensor_offset_1std": 0.04,
+   "S_one_sensor_offset_2std": 0.065,
+   "S_one_sensor_offset_3std": 0.095,
+   "S_one_sensor_stuck": 0.065
+  }
+ },
+ "matched|any_column": {
+  "threshold": 0.663,
+  "fire_rate_heldout": {
+   "A_fd001_official_test": 0.0,
+   "A_old_fleet_rul_le_30": 0.0,
+   "A_young_fleet_truncated": 0.0,
+   "D_fd002": 1.0,
+   "D_fd003": 1.0,
+   "N_small_fleet_5_engines": 0.035,
+   "N_steady_fleet": 0.0,
+   "S_one_sensor_offset_0.5std": 0.01,
+   "S_one_sensor_offset_1std": 1.0,
+   "S_one_sensor_offset_2std": 1.0,
+   "S_one_sensor_offset_3std": 1.0,
+   "S_one_sensor_stuck": 0.9
+  }
+ },
+ "resid|share>0.5": {
+  "threshold": 0.206,
+  "fire_rate_heldout": {
+   "A_fd001_official_test": 0.0,
+   "A_old_fleet_rul_le_30": 0.02,
+   "A_young_fleet_truncated": 0.005,
+   "D_fd002": 1.0,
+   "D_fd003": 1.0,
+   "N_small_fleet_5_engines": 0.01,
+   "N_steady_fleet": 0.0,
+   "S_one_sensor_offset_0.5std": 0.66,
+   "S_one_sensor_offset_1std": 0.985,
+   "S_one_sensor_offset_2std": 1.0,
+   "S_one_sensor_offset_3std": 1.0,
+   "S_one_sensor_stuck": 0.2
+  }
+ },
+ "resid|any_column": {
+  "threshold": 0.475,
+  "fire_rate_heldout": {
+   "A_fd001_official_test": 0.0,
+   "A_old_fleet_rul_le_30": 0.0,
+   "A_young_fleet_truncated": 0.0,
+   "D_fd002": 1.0,
+   "D_fd003": 1.0,
+   "N_small_fleet_5_engines": 0.02,
+   "N_steady_fleet": 0.0,
+   "S_one_sensor_offset_0.5std": 1.0,
+   "S_one_sensor_offset_1std": 1.0,
+   "S_one_sensor_offset_2std": 1.0,
+   "S_one_sensor_offset_3std": 1.0,
+   "S_one_sensor_stuck": 1.0
+  }
+ }
+}

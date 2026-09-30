@@ -323,85 +323,144 @@
         "pool_rows": 16813,
         "evidently_default": {
           "mean_drift_share": 0.017857142857142856,
-          "retrain_trigger_rate": 0.0
+          "retrain_trigger_rate": 0.0,
+          "sensor_alert_rate": 0.0
         },
         "configured": {
           "mean_drift_share": 0.0,
-          "retrain_trigger_rate": 0.0
+          "retrain_trigger_rate": 0.0,
+          "sensor_alert_rate": 0.0
         }
       },
       "no_drift_heldout_fd001_engines": {
         "pool_rows": 3818,
         "evidently_default": {
           "mean_drift_share": 0.8035714285714286,
-          "retrain_trigger_rate": 0.9
+          "retrain_trigger_rate": 0.9,
+          "sensor_alert_rate": 0.0
         },
         "configured": {
           "mean_drift_share": 0.0,
-          "retrain_trigger_rate": 0.0
+          "retrain_trigger_rate": 0.0,
+          "sensor_alert_rate": 0.0
+        }
+      },
+      "no_drift_1_unseen_fd001_engine": {
+        "pool_rows": null,
+        "evidently_default": {
+          "mean_drift_share": 1.0,
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 0.0
+        },
+        "configured": {
+          "mean_drift_share": 0.6392857142857142,
+          "retrain_trigger_rate": 0.6,
+          "sensor_alert_rate": 0.85
+        }
+      },
+      "no_drift_2_unseen_fd001_engines": {
+        "pool_rows": null,
+        "evidently_default": {
+          "mean_drift_share": 0.9892857142857142,
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 0.0
+        },
+        "configured": {
+          "mean_drift_share": 0.3107142857142857,
+          "retrain_trigger_rate": 0.15,
+          "sensor_alert_rate": 0.6
+        }
+      },
+      "no_drift_3_unseen_fd001_engines": {
+        "pool_rows": null,
+        "evidently_default": {
+          "mean_drift_share": 0.9928571428571429,
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 0.0
+        },
+        "configured": {
+          "mean_drift_share": 0.17857142857142855,
+          "retrain_trigger_rate": 0.05,
+          "sensor_alert_rate": 0.15
         }
       },
       "no_drift_5_unseen_fd001_engines": {
         "pool_rows": null,
         "evidently_default": {
-          "mean_drift_share": 0.9785714285714286,
-          "retrain_trigger_rate": 1.0
+          "mean_drift_share": 0.8678571428571427,
+          "retrain_trigger_rate": 0.85,
+          "sensor_alert_rate": 0.0
         },
         "configured": {
-          "mean_drift_share": 0.11785714285714284,
-          "retrain_trigger_rate": 0.05
+          "mean_drift_share": 0.06428571428571428,
+          "retrain_trigger_rate": 0.0,
+          "sensor_alert_rate": 0.05
         }
       },
       "fd001_official_test_set": {
         "pool_rows": 13096,
         "evidently_default": {
           "mean_drift_share": 1.0,
-          "retrain_trigger_rate": 1.0
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 0.0
         },
         "configured": {
-          "mean_drift_share": 0.6964285714285713,
-          "retrain_trigger_rate": 1.0
+          "mean_drift_share": 0.0,
+          "retrain_trigger_rate": 0.0,
+          "sensor_alert_rate": 0.0
         }
       },
       "fd001_heldout_near_failure_rul_le_30": {
         "pool_rows": 620,
         "evidently_default": {
           "mean_drift_share": 1.0,
-          "retrain_trigger_rate": 1.0
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 0.0
         },
         "configured": {
-          "mean_drift_share": 1.0,
-          "retrain_trigger_rate": 1.0
+          "mean_drift_share": 0.0,
+          "retrain_trigger_rate": 0.0,
+          "sensor_alert_rate": 0.05
         }
       },
       "fd003_new_fault_mode": {
         "pool_rows": 24720,
         "evidently_default": {
           "mean_drift_share": 0.9035714285714287,
-          "retrain_trigger_rate": 1.0
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 0.0
         },
         "configured": {
-          "mean_drift_share": 0.8571428571428571,
-          "retrain_trigger_rate": 1.0
+          "mean_drift_share": 0.8285714285714285,
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 1.0
         }
       },
       "fd002_six_operating_conditions": {
         "pool_rows": 53759,
         "evidently_default": {
           "mean_drift_share": 1.0,
-          "retrain_trigger_rate": 1.0
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 0.0
         },
         "configured": {
           "mean_drift_share": 1.0,
-          "retrain_trigger_rate": 1.0
+          "retrain_trigger_rate": 1.0,
+          "sensor_alert_rate": 1.0
         }
-      }
-    },
-    "settings": {
-      "evidently_default": {},
-      "configured": {
-        "stattest": "wasserstein",
-        "stattest_threshold": 0.47
+      },
+      "one_sensor_offset_1std": {
+        "pool_rows": null,
+        "evidently_default": {
+          "mean_drift_share": 0.8178571428571428,
+          "retrain_trigger_rate": 0.9,
+          "sensor_alert_rate": 0.0
+        },
+        "configured": {
+          "mean_drift_share": 0.12857142857142856,
+          "retrain_trigger_rate": 0.05,
+          "sensor_alert_rate": 1.0
+        }
       }
     }
   }

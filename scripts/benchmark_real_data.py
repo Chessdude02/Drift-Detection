@@ -9,10 +9,11 @@ Two things are measured:
    RUL_FD00x.txt. This is the number the C-MAPSS literature reports. Repeated over
    several seeds because the train/val split only has ~20 validation engines.
 
-2. Drift detector behaviour. pdm.drift.run_drift_check.compute_drift_score is run on
-   500-row windows (config/drift.yaml's lookback_rows) against the FD001 reference, for
-   scenarios with and without a real distribution shift, and the share of windows that
-   cross config/drift.yaml's threshold is reported.
+2. Drift-check behaviour. pdm.drift.run_drift_check.evaluate_window is run on 500-row
+   windows (config/drift.yaml's lookback_rows) against an FD001 reference, for scenarios
+   with and without a real distribution shift, once with the original Evidently defaults
+   and once with config/drift.yaml as shipped. Reported: how often the retrain trigger
+   fires and how often the sensor-fault alert fires.
 
 Usage:
     python scripts/benchmark_real_data.py --raw-dir data/raw
@@ -35,7 +36,8 @@ from pdm.common.config import load_yaml  # noqa: E402
 from pdm.data.cmapss import load_test, load_train  # noqa: E402
 from pdm.data.datasets import get_adapter  # noqa: E402
 from pdm.data.features import build_feature_matrix  # noqa: E402
-from pdm.drift.run_drift_check import compute_drift_score  # noqa: E402
+from pdm.drift.life_stage import add_oof_predictions  # noqa: E402
+from pdm.drift.run_drift_check import evaluate_window  # noqa: E402
 from pdm.training.evaluate import mae, rmse  # noqa: E402
 from pdm.training.train import _fit_model  # noqa: E402
 
@@ -106,7 +108,8 @@ def evaluate_subset(raw_dir: Path, config: dict, subset: str) -> dict:
 
 
 def drift_windows(raw_dir: Path, config: dict, drift_cfg: dict) -> dict:
-    features_cfg = config["features"]
+    features_cfg, model_cfg = config["features"], config["model"]
+    model_cfg = {**model_cfg, "params": {**model_cfg["params"], "verbose": -1}}
     sensors = features_cfg["sensor_columns"]
     windows = features_cfg["rolling_windows"]
     pw = max(windows)
@@ -117,34 +120,67 @@ def drift_windows(raw_dir: Path, config: dict, drift_cfg: dict) -> dict:
     def feats(df):
         return build_feature_matrix(df, sensors, windows, pw)
 
-    fd001 = load_train(raw_dir, "FD001")
+    fd001, feat_cols = get_adapter("cmapss")["load"](
+        raw_dir, {**config["dataset"], "subset": "FD001"}, features_cfg
+    )
     units = np.array(sorted(fd001["unit_number"].unique()))
     rng = np.random.default_rng(42)
     ref_units = rng.choice(units, size=80, replace=False)
-    held_units = np.setdiff1d(units, ref_units)
-
-    fd001_feats = feats(fd001)
-    fd001_feats["rul"] = fd001.sort_values(["unit_number", "time_in_cycles"])["rul"].values
-    reference = fd001_feats[fd001_feats["unit_number"].isin(ref_units)]
-    held = fd001_feats[fd001_feats["unit_number"].isin(held_units)]
+    held = fd001[~fd001["unit_number"].isin(ref_units)]
+    # Reference built exactly like scripts/seed_reference_data.py (out-of-fold predicted
+    # RUL); a model trained on it plays the served model for the current windows.
+    reference = add_oof_predictions(
+        fd001[fd001["unit_number"].isin(ref_units)], feat_cols, model_cfg
+    )
+    served = _fit_model(
+        model_cfg["algorithm"], model_cfg["params"], reference[feat_cols], reference["rul"]
+    )
 
     test001, _ = load_test(raw_dir, "FD001")
 
-    # Production-like window: consecutive rows from 5 unseen FD001 engines.
-    def five_engine_window(t):
-        u = np.random.default_rng(t).choice(held["unit_number"].unique(), 5, replace=False)
-        return held[held["unit_number"].isin(u)].tail(n)
+    # Small-fleet windows: n rows drawn from exactly k unseen FD001 engines. Both checks
+    # need ~5+ engines per window; fewer and one engine's quirks read as drift/faults.
+    def k_engine_window(k):
+        def make(t):
+            u = np.random.default_rng(t).choice(held["unit_number"].unique(), k, replace=False)
+            sub = held[held["unit_number"].isin(u)]
+            return sub.sample(n=min(n, len(sub)), random_state=t)
+
+        return make
+
+    def one_sensor_offset(t):
+        w = held.sample(n=n, random_state=t).copy()
+        col = cols[t % len(cols)]
+        w[col] = w[col] + reference[col].std()
+        return w
 
     scenarios = {
         "control_same_engines_as_reference": reference,
         "no_drift_heldout_fd001_engines": held,
-        "no_drift_5_unseen_fd001_engines": five_engine_window,
+        "no_drift_1_unseen_fd001_engine": k_engine_window(1),
+        "no_drift_2_unseen_fd001_engines": k_engine_window(2),
+        "no_drift_3_unseen_fd001_engines": k_engine_window(3),
+        "no_drift_5_unseen_fd001_engines": k_engine_window(5),
         "fd001_official_test_set": feats(test001),
         "fd001_heldout_near_failure_rul_le_30": held[held["rul"] <= 30],
         "fd003_new_fault_mode": feats(load_train(raw_dir, "FD003")),
         "fd002_six_operating_conditions": feats(load_train(raw_dir, "FD002")),
+        "one_sensor_offset_1std": one_sensor_offset,
     }
 
+    # "evidently_default" = the original check: Evidently's own per-column test against
+    # the plain reference, no sensor check. "configured" = config/drift.yaml as shipped
+    # (life-stage matching, calibrated threshold, sensor check), via evaluate_window.
+    off = {"enabled": False}
+    settings = {
+        "evidently_default": {
+            **drift_cfg,
+            "drift": {**drift_cfg["drift"], "stattest": None, "stattest_threshold": None},
+            "life_stage_matching": off,
+            "sensor_check": off,
+        },
+        "configured": drift_cfg,
+    }
     out = {
         "threshold": threshold,
         "window_rows": n,
@@ -152,34 +188,25 @@ def drift_windows(raw_dir: Path, config: dict, drift_cfg: dict) -> dict:
         "reference_rows": int(len(reference)),
         "scenarios": {},
     }
-    # "evidently_default" = Evidently's own per-column test; "configured" = the
-    # stattest/stattest_threshold in config/drift.yaml (see scripts/calibrate_drift.py).
-    settings = {
-        "evidently_default": {},
-        "configured": {
-            "stattest": drift_cfg["drift"].get("stattest"),
-            "stattest_threshold": drift_cfg["drift"].get("stattest_threshold"),
-        },
-    }
-    out["settings"] = settings
     for name, pool in scenarios.items():
         out["scenarios"][name] = {"pool_rows": None if callable(pool) else int(len(pool))}
-        for label, kwargs in settings.items():
-            scores = []
+        for label, cfg in settings.items():
+            shares, alerts = [], []
             for t in range(DRIFT_TRIALS):
                 if callable(pool):
                     window = pool(t)
                 else:
                     window = pool.sample(n=min(n, len(pool)), random_state=t)
-                scores.append(
-                    compute_drift_score(reference, window, cols, **kwargs)[
-                        "share_of_drifted_columns"
-                    ]
-                )
-            scores = np.array(scores)
+                window = window.copy()
+                window["prediction"] = served.predict(window[feat_cols])
+                result = evaluate_window(reference, window, cols, cfg)
+                shares.append(result["drift"]["share_of_drifted_columns"])
+                alerts.append(bool(result["faulty_sensors"]))
+            shares = np.array(shares)
             out["scenarios"][name][label] = {
-                "mean_drift_share": float(scores.mean()),
-                "retrain_trigger_rate": float((scores > threshold).mean()),
+                "mean_drift_share": float(shares.mean()),
+                "retrain_trigger_rate": float((shares > threshold).mean()),
+                "sensor_alert_rate": float(np.mean(alerts)),
             }
     return out
 
@@ -212,10 +239,9 @@ def main() -> int:
     for name, s in result["drift"]["scenarios"].items():
         print(
             f"drift {name}: "
-            f"default trigger={s['evidently_default']['retrain_trigger_rate']:.2f} "
-            f"(share {s['evidently_default']['mean_drift_share']:.2f})  "
-            f"configured trigger={s['configured']['retrain_trigger_rate']:.2f} "
-            f"(share {s['configured']['mean_drift_share']:.2f})"
+            f"default retrain={s['evidently_default']['retrain_trigger_rate']:.2f}  "
+            f"configured retrain={s['configured']['retrain_trigger_rate']:.2f} "
+            f"sensor_alert={s['configured']['sensor_alert_rate']:.2f}"
         )
 
     out = Path(args.out)

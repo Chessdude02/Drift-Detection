@@ -21,6 +21,21 @@ spec:
               exceeded 0.5 for 5 minutes. A retrain Job should already have been triggered
               by src/pdm/drift/trigger_retrain.py — check `kubectl get jobs -n pdm`.
 
+        - alert: SensorFaultSuspected
+          expr: pdm_sensor_fault == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Suspected fault on {{ $labels.sensor }}"
+            description: >
+              The latest drift check found {{ $labels.sensor }} no longer tracks the other
+              sensors the way it did in training - likely a biased or stuck sensor. Inspect
+              the sensor; see pdm_sensor_fault_score for the per-sensor scores. If several
+              sensors fire, the highest score is the most likely culprit (an offset on one
+              sensor also nudges the others' scores). This alert does NOT trigger
+              retraining: retraining on a broken sensor's data would bake the fault in.
+
         - alert: ServingErrorRateSpike
           expr: |
             sum(rate(pdm_predictions_total{status="error", shadow="false"}[5m]))
