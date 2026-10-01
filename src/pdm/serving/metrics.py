@@ -21,6 +21,14 @@ PREDICTION_VALUE = Histogram(
 )
 FEATURE_MEAN = Gauge("pdm_feature_mean", "Rolling mean of an input feature", ["feature"])
 FEATURE_STDDEV = Gauge("pdm_feature_stddev", "Rolling stddev of an input feature", ["feature"])
+INPUT_REJECTED = Counter(
+    "pdm_input_rejected_total", "Prediction requests rejected by input validation", ["reason"]
+)
+INPUT_OUT_OF_RANGE = Counter(
+    "pdm_input_out_of_range_total",
+    "Accepted requests with a feature outside the training range",
+    ["feature"],
+)
 MODEL_INFO = Gauge(
     "pdm_model_version_info", "Currently loaded model version", ["model_name", "version"]
 )

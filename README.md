@@ -6,6 +6,13 @@ FastAPI, and keep it healthy in production with automated CI/CD, staged rollouts
 rollback, drift-triggered retraining, shadow deployment, and Prometheus/Grafana
 observability.
 
+## Documentation
+
+- [`docs/execution.md`](docs/execution.md): how the code runs (entry points, flow, call graph, config, failure paths).
+- [`docs/decisions.md`](docs/decisions.md): why it is built this way, with measured effects.
+- [`docs/run_log.md`](docs/run_log.md): every measurement run and its numbers.
+- [`RUNBOOK.md`](RUNBOOK.md): operations (alerts, outcomes, rollback).
+
 ## Architecture
 
 ```
@@ -124,42 +131,60 @@ the pipeline in `config/training.yaml` unchanged, mean ± std over 5 seeds.
   published C-MAPSS results (roughly 12-18 RMSE on FD001). It passes the
   `max_rmse: 35.0` gate by a wide margin, so that gate does not separate a good model
   from a mediocre one.
+- **Current pipeline** (`config/training.yaml`: 20 frozen holdout engines excluded,
+  cross-validated calibration): NASA FD001 test RMSE **21.4**, 87% interval coverage,
+  and on the frozen holdout 12.2 cost per engine with 0 unplanned failures. The table
+  above is the original pipeline. Details: `docs/decisions.md` D-26,
+  `reports/model_quality_cv.json`.
 - The single-split val RMSE that `train.py` logs (18.9 on FD001 with seed 42) is on the
   lucky side of its own ±2.6 spread; don't quote it as the model's accuracy.
 
-**Drift detector** (`compute_drift_score` with `config/drift.yaml`: 500-row windows,
-retrain when > 50% of columns drift; reference = 80 FD001 training engines; 20 windows
-per scenario). "Default" = Evidently's own per-column test (normed Wasserstein, 0.1);
-"calibrated" = the `stattest_threshold: 0.47` now in `config/drift.yaml`.
+**Drift check.** Two separate checks run on every window (`evaluate_window` in
+`src/pdm/drift/run_drift_check.py`, settings in `config/drift.yaml`):
 
-| Scenario | Real shift? | Retrain triggered (default) | Retrain triggered (calibrated) |
-|---|---|---|---|
-| Rows from the reference engines themselves | No | 0% | 0% |
-| Random rows from 20 unseen FD001 engines | No | 90% | 0% |
-| 5 unseen FD001 engines (small fleet) | No | 100% | 5% |
-| FD001 official test set | No (engines earlier in life) | 100% | 100% |
-| Unseen FD001 engines near failure (RUL ≤ 30) | Normal wear | 100% | 100% |
-| FD003 (new fault mode) | Yes | 100% | 100% |
-| FD002 (six operating conditions) | Yes | 100% | 100% |
+- **Retrain trigger:** fires when more than half of the 14 sensor columns drift. Each
+  window is compared against a reference resampled to the same mix of predicted
+  remaining life (`src/pdm/drift/life_stage.py`), so a fleet that is simply younger or
+  older than the training data does not count as drift.
+- **Sensor-fault alert:** predicts each sensor from the other 13 and flags a sensor whose
+  prediction error shifts (`src/pdm/drift/sensor_check.py`). It raises the
+  `SensorFaultSuspected` alert and **never** triggers retraining. Why: see `docs/decisions.md` (D-5, D-21).
 
-- With the default test, engines differ from each other more than 0.1 allows, so almost
-  any window of *new* engines looks like drift and the retrain job would fire on nearly
-  every check.
-- `scripts/calibrate_drift.py` picks the threshold from normal windows on 60 FD001
-  engines and checks it on 40 engines it never saw (`reports/drift_calibration.json`):
-  false alarms 0% (large fleet) / 4.5% (5-engine fleet); detection 100% for FD002,
-  99.5% for FD003, 100% for a 1-std offset on all sensors, 89% at 0.5 std, 0% at
-  0.25 std.
+Benchmark: 500-row windows, reference = 80 FD001 training engines, 20 windows per
+scenario. "Original" = the check as it first shipped (Evidently defaults, plain
+reference, no sensor check).
 
-What the calibrated check still gets wrong:
+| Scenario | Real problem? | Retrain (original) | Retrain (now) | Sensor alert (now) |
+|---|---|---|---|---|
+| Rows from the reference engines themselves | No | 0% | 0% | 0% |
+| Random rows from 20 unseen FD001 engines | No | 90% | 0% | 0% |
+| 5 unseen FD001 engines | No | 85% | 0% | 5% |
+| FD001 official test set (engines earlier in life) | No | 100% | 0% | 0% |
+| Unseen FD001 engines near failure (RUL ≤ 30) | No, normal wear | 100% | 0% | 5% |
+| FD003 (new fault mode) | Yes | 100% | 100% | 100% |
+| FD002 (six operating conditions) | Yes | 100% | 100% | 100% |
+| One sensor offset by 1 std | Yes, broken sensor | 90% | 5% | 100% |
 
-- **A single faulty sensor is invisible.** An offset on 3 of the 14 sensors is never
-  detected, even at 2 std, because retraining needs more than half the columns to drift.
-- **Normal ageing looks like drift.** The reference is built from engines run all the way
-  to failure, while a live fleet is mostly mid-life (like the official test set, which
-  triggers 100% of the time). A fleet that gets younger or older on average will trigger
-  a retrain. Fixing this needs a reference that matches the fleet's life-stage mix, not
-  a different threshold.
+Thresholds come from `scripts/calibrate_drift.py`: set on normal windows from 60 FD001
+engines, checked on 40 engines they never saw (`reports/drift_calibration.json`, 120
+windows per scenario):
+
+- False alarms on normal and ageing fleets: retrain 0-0.8%, sensor alert 0-3.3%.
+- Real shifts: retrain fires 100% (FD002) and 97% (FD003).
+- One broken sensor (0.5, 1 or 2 std offset, or stuck at a constant): the alert fires
+  100% of the time and names the right sensor first 100% of the time.
+
+What the checks still get wrong:
+
+- **Windows need about 5+ engines.** With fewer, one engine's quirks read as drift or a
+  fault (false retrain / false sensor alert: 1 engine 60% / 85%, 2 engines 15% / 60%,
+  3 engines 5% / 15%, 5 engines 0% / 5%). The inference log does not record which
+  engine a reading came from, so this cannot be enforced yet.
+- **A broken sensor still triggers a retrain up to 9% of the time** (the alert fires too, so
+  on-call can tell). Nothing yet stops that retrain.
+- **All numbers are FD001 only**, with 120 windows per scenario: a measured 0% means
+  "probably under ~2.5%", not "never". Recalibrate if the features, window size, model
+  or reference data change.
 
 ## Notes and known limitations
 

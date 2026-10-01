@@ -1,0 +1,606 @@
+{
+  "seeds": [
+    42,
+    0,
+    1,
+    2,
+    3
+  ],
+  "tuned_chosen_on_validation": "tuned_c",
+  "variants": {
+    "baseline": {
+      "summary": {
+        "val_rmse": {
+          "mean": 22.890832591948275,
+          "std": 1.552349393054312
+        },
+        "val_cost_per_engine": {
+          "mean": 11.732500000000002,
+          "std": 0.29916550603303194
+        },
+        "test_rmse": {
+          "mean": 22.282199065441993,
+          "std": 0.2699652186786958
+        },
+        "interval_coverage": {
+          "mean": 0.8859999999999999,
+          "std": 0.016733200530681523
+        },
+        "interval_mean_width": {
+          "mean": 58.88657245992168,
+          "std": 4.487108052937838
+        },
+        "cost_per_engine": {
+          "mean": 12.986,
+          "std": 1.89517611318843
+        },
+        "unplanned_failures": {
+          "mean": 0.2,
+          "std": 0.44721359549995804
+        },
+        "mean_wasted_cycles": {
+          "mean": 21.052631578947363,
+          "std": 3.2744377411665075
+        },
+        "predict_ms_single_row": 7.789325875000941
+      },
+      "runs": [
+        {
+          "seed": 42,
+          "val_rmse": 24.94495370277404,
+          "val_cost_per_engine": 12.14375,
+          "test_rmse": 22.66389208428138,
+          "interval_coverage": 0.91,
+          "interval_mean_width": 65.03211903852514,
+          "cost_per_engine": 12.675,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 26.75,
+          "maintenance_threshold": 9.0
+        },
+        {
+          "seed": 0,
+          "val_rmse": 23.748171279006396,
+          "val_cost_per_engine": 11.75625,
+          "test_rmse": 22.41002652364342,
+          "interval_coverage": 0.89,
+          "interval_mean_width": 59.07698772775173,
+          "cost_per_engine": 12.004999999999999,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 20.05,
+          "maintenance_threshold": 10.0
+        },
+        {
+          "seed": 1,
+          "val_rmse": 20.808095275858648,
+          "val_cost_per_engine": 11.33125,
+          "test_rmse": 21.99966242564683,
+          "interval_coverage": 0.87,
+          "interval_mean_width": 56.040962446792655,
+          "cost_per_engine": 16.330000000000002,
+          "unplanned_failures": 1.0,
+          "mean_wasted_cycles": 19.263157894736842,
+          "maintenance_threshold": 10.0
+        },
+        {
+          "seed": 2,
+          "val_rmse": 22.434482147379786,
+          "val_cost_per_engine": 11.6,
+          "test_rmse": 22.05937354386047,
+          "interval_coverage": 0.87,
+          "interval_mean_width": 53.36358105783314,
+          "cost_per_engine": 11.86,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 18.6,
+          "maintenance_threshold": 11.0
+        },
+        {
+          "seed": 3,
+          "val_rmse": 22.51846055472251,
+          "val_cost_per_engine": 11.83125,
+          "test_rmse": 22.27804074977786,
+          "interval_coverage": 0.89,
+          "interval_mean_width": 60.91921202870577,
+          "cost_per_engine": 12.059999999999999,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 20.6,
+          "maintenance_threshold": 9.0
+        }
+      ]
+    },
+    "tuned_c": {
+      "summary": {
+        "val_rmse": {
+          "mean": 22.919813554065687,
+          "std": 1.6648989512210275
+        },
+        "val_cost_per_engine": {
+          "mean": 11.786249999999999,
+          "std": 0.3579837199510612
+        },
+        "test_rmse": {
+          "mean": 22.267548897372933,
+          "std": 0.43940975711724006
+        },
+        "interval_coverage": {
+          "mean": 0.8859999999999999,
+          "std": 0.026076809620810618
+        },
+        "interval_mean_width": {
+          "mean": 58.83665979201705,
+          "std": 5.064599068927181
+        },
+        "cost_per_engine": {
+          "mean": 12.128,
+          "std": 0.40863492263877826
+        },
+        "unplanned_failures": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "mean_wasted_cycles": {
+          "mean": 21.28,
+          "std": 4.086349226387779
+        },
+        "predict_ms_single_row": 12.171718055001293
+      },
+      "runs": [
+        {
+          "seed": 42,
+          "val_rmse": 25.25209336920075,
+          "val_cost_per_engine": 12.2,
+          "test_rmse": 22.959017268751307,
+          "interval_coverage": 0.92,
+          "interval_mean_width": 64.82854572591306,
+          "cost_per_engine": 12.72,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 27.2,
+          "maintenance_threshold": 9.0
+        },
+        {
+          "seed": 0,
+          "val_rmse": 23.652423920865164,
+          "val_cost_per_engine": 11.725,
+          "test_rmse": 22.39825025651542,
+          "interval_coverage": 0.9,
+          "interval_mean_width": 60.896085542258525,
+          "cost_per_engine": 12.02,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 20.2,
+          "maintenance_threshold": 10.0
+        },
+        {
+          "seed": 1,
+          "val_rmse": 20.753067131081494,
+          "val_cost_per_engine": 11.24375,
+          "test_rmse": 22.05147267565275,
+          "interval_coverage": 0.86,
+          "interval_mean_width": 54.41919205440591,
+          "cost_per_engine": 11.655,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 16.55,
+          "maintenance_threshold": 11.0
+        },
+        {
+          "seed": 2,
+          "val_rmse": 22.389544944072966,
+          "val_cost_per_engine": 11.76875,
+          "test_rmse": 22.117388997219365,
+          "interval_coverage": 0.86,
+          "interval_mean_width": 52.75709243568216,
+          "cost_per_engine": 11.92,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 19.2,
+          "maintenance_threshold": 11.0
+        },
+        {
+          "seed": 3,
+          "val_rmse": 22.551938405108064,
+          "val_cost_per_engine": 11.99375,
+          "test_rmse": 21.811615288725825,
+          "interval_coverage": 0.89,
+          "interval_mean_width": 61.282383201825624,
+          "cost_per_engine": 12.325,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 23.25,
+          "maintenance_threshold": 11.0
+        }
+      ]
+    },
+    "trend": {
+      "summary": {
+        "val_rmse": {
+          "mean": 17.674193768146104,
+          "std": 1.1303534055476756
+        },
+        "val_cost_per_engine": {
+          "mean": 10.82625,
+          "std": 0.2338702899044683
+        },
+        "test_rmse": {
+          "mean": 18.112483150050593,
+          "std": 0.44993239524686535
+        },
+        "interval_coverage": {
+          "mean": 0.8859999999999999,
+          "std": 0.020736441353327736
+        },
+        "interval_mean_width": {
+          "mean": 50.20286403586656,
+          "std": 2.9199454475276054
+        },
+        "cost_per_engine": {
+          "mean": 11.988,
+          "std": 1.9895370064414488
+        },
+        "unplanned_failures": {
+          "mean": 0.2,
+          "std": 0.447213595499958
+        },
+        "mean_wasted_cycles": {
+          "mean": 10.989473684210527,
+          "std": 1.246717296190479
+        },
+        "predict_ms_single_row": 8.032101149997288
+      },
+      "runs": [
+        {
+          "seed": 42,
+          "val_rmse": 19.692502402687353,
+          "val_cost_per_engine": 11.05625,
+          "test_rmse": 18.04716894722029,
+          "interval_coverage": 0.9,
+          "interval_mean_width": 54.01843499118044,
+          "cost_per_engine": 11.27,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 12.7,
+          "maintenance_threshold": 9.0
+        },
+        {
+          "seed": 0,
+          "val_rmse": 17.1257896589174,
+          "val_cost_per_engine": 10.6625,
+          "test_rmse": 17.765410510577922,
+          "interval_coverage": 0.89,
+          "interval_mean_width": 48.991396077196875,
+          "cost_per_engine": 10.92,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 9.2,
+          "maintenance_threshold": 8.0
+        },
+        {
+          "seed": 1,
+          "val_rmse": 17.286366733874328,
+          "val_cost_per_engine": 10.6,
+          "test_rmse": 17.605312470289846,
+          "interval_coverage": 0.9,
+          "interval_mean_width": 51.203105340029815,
+          "cost_per_engine": 11.084999999999999,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 10.85,
+          "maintenance_threshold": 8.0
+        },
+        {
+          "seed": 2,
+          "val_rmse": 17.115508243462966,
+          "val_cost_per_engine": 11.1,
+          "test_rmse": 18.522181164245634,
+          "interval_coverage": 0.85,
+          "interval_mean_width": 46.100479096361056,
+          "cost_per_engine": 11.125,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 11.25,
+          "maintenance_threshold": 11.0
+        },
+        {
+          "seed": 3,
+          "val_rmse": 17.15080180178847,
+          "val_cost_per_engine": 10.7125,
+          "test_rmse": 18.622342657919283,
+          "interval_coverage": 0.89,
+          "interval_mean_width": 50.700904674564626,
+          "cost_per_engine": 15.540000000000001,
+          "unplanned_failures": 1.0,
+          "mean_wasted_cycles": 10.947368421052632,
+          "maintenance_threshold": 7.0
+        }
+      ]
+    },
+    "baseline_cv": {
+      "summary": {
+        "val_rmse": {
+          "mean": 21.30642291749129,
+          "std": 0.4392567578314141
+        },
+        "val_cost_per_engine": {
+          "mean": 11.97475,
+          "std": 0.19593406097460428
+        },
+        "test_rmse": {
+          "mean": 21.39798510142996,
+          "std": 0.0
+        },
+        "interval_coverage": {
+          "mean": 0.8779999999999999,
+          "std": 0.021679483388678818
+        },
+        "interval_mean_width": {
+          "mean": 57.02786997616399,
+          "std": 2.4329773995776756
+        },
+        "cost_per_engine": {
+          "mean": 12.379000000000001,
+          "std": 0.19670409248411685
+        },
+        "unplanned_failures": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "mean_wasted_cycles": {
+          "mean": 23.79,
+          "std": 1.9670409248411687
+        },
+        "predict_ms_single_row": 8.203671854998902
+      },
+      "runs": [
+        {
+          "seed": 42,
+          "val_rmse": 21.06903868737618,
+          "val_cost_per_engine": 11.82,
+          "test_rmse": 21.39798510142996,
+          "interval_coverage": 0.87,
+          "interval_mean_width": 56.637284780354285,
+          "cost_per_engine": 12.205,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 22.05,
+          "maintenance_threshold": 12.0
+        },
+        {
+          "seed": 0,
+          "val_rmse": 21.23369367313783,
+          "val_cost_per_engine": 11.85375,
+          "test_rmse": 21.39798510142996,
+          "interval_coverage": 0.87,
+          "interval_mean_width": 55.75437268068936,
+          "cost_per_engine": 12.275,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 22.75,
+          "maintenance_threshold": 13.0
+        },
+        {
+          "seed": 1,
+          "val_rmse": 20.739399011809386,
+          "val_cost_per_engine": 12.19875,
+          "test_rmse": 21.39798510142996,
+          "interval_coverage": 0.85,
+          "interval_mean_width": 53.95782105361474,
+          "cost_per_engine": 12.58,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 25.8,
+          "maintenance_threshold": 15.0
+        },
+        {
+          "seed": 2,
+          "val_rmse": 21.7005839501901,
+          "val_cost_per_engine": 12.178749999999999,
+          "test_rmse": 21.39798510142996,
+          "interval_coverage": 0.9,
+          "interval_mean_width": 58.597451061885074,
+          "cost_per_engine": 12.605,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 26.05,
+          "maintenance_threshold": 13.0
+        },
+        {
+          "seed": 3,
+          "val_rmse": 21.789399264942944,
+          "val_cost_per_engine": 11.8225,
+          "test_rmse": 21.39798510142996,
+          "interval_coverage": 0.9,
+          "interval_mean_width": 60.19242030427648,
+          "cost_per_engine": 12.23,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 22.3,
+          "maintenance_threshold": 12.0
+        }
+      ]
+    },
+    "tuned_c_cv": {
+      "summary": {
+        "val_rmse": {
+          "mean": 21.300952097928466,
+          "std": 0.45393409805724466
+        },
+        "val_cost_per_engine": {
+          "mean": 11.771250000000002,
+          "std": 0.15674172625692276
+        },
+        "test_rmse": {
+          "mean": 21.38869913307075,
+          "std": 0.0
+        },
+        "interval_coverage": {
+          "mean": 0.876,
+          "std": 0.0054772255750516665
+        },
+        "interval_mean_width": {
+          "mean": 57.706246020806034,
+          "std": 2.6521335150317684
+        },
+        "cost_per_engine": {
+          "mean": 12.287,
+          "std": 0.16709278859364327
+        },
+        "unplanned_failures": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "mean_wasted_cycles": {
+          "mean": 22.869999999999997,
+          "std": 1.6709278859364336
+        },
+        "predict_ms_single_row": 11.807949965000262
+      },
+      "runs": [
+        {
+          "seed": 42,
+          "val_rmse": 21.132194006509117,
+          "val_cost_per_engine": 11.647499999999999,
+          "test_rmse": 21.38869913307075,
+          "interval_coverage": 0.87,
+          "interval_mean_width": 56.622609022726174,
+          "cost_per_engine": 12.11,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 21.1,
+          "maintenance_threshold": 11.0
+        },
+        {
+          "seed": 0,
+          "val_rmse": 21.063540509057344,
+          "val_cost_per_engine": 11.71125,
+          "test_rmse": 21.38869913307075,
+          "interval_coverage": 0.87,
+          "interval_mean_width": 55.67043345675358,
+          "cost_per_engine": 12.205,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 22.05,
+          "maintenance_threshold": 12.0
+        },
+        {
+          "seed": 1,
+          "val_rmse": 20.765273592211187,
+          "val_cost_per_engine": 11.6525,
+          "test_rmse": 21.38869913307075,
+          "interval_coverage": 0.88,
+          "interval_mean_width": 55.16141625873688,
+          "cost_per_engine": 12.209999999999999,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 22.1,
+          "maintenance_threshold": 12.0
+        },
+        {
+          "seed": 2,
+          "val_rmse": 21.705202952913524,
+          "val_cost_per_engine": 11.82375,
+          "test_rmse": 21.38869913307075,
+          "interval_coverage": 0.88,
+          "interval_mean_width": 60.924558013257325,
+          "cost_per_engine": 12.379999999999999,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 23.8,
+          "maintenance_threshold": 11.0
+        },
+        {
+          "seed": 3,
+          "val_rmse": 21.838549428951154,
+          "val_cost_per_engine": 12.02125,
+          "test_rmse": 21.38869913307075,
+          "interval_coverage": 0.88,
+          "interval_mean_width": 60.15221335255618,
+          "cost_per_engine": 12.53,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 25.3,
+          "maintenance_threshold": 14.0
+        }
+      ]
+    },
+    "trend_cv": {
+      "summary": {
+        "val_rmse": {
+          "mean": 16.515960854736104,
+          "std": 0.4022242985184067
+        },
+        "val_cost_per_engine": {
+          "mean": 10.83575,
+          "std": 0.05400810124416516
+        },
+        "test_rmse": {
+          "mean": 17.754120628014046,
+          "std": 0.0
+        },
+        "interval_coverage": {
+          "mean": 0.8640000000000001,
+          "std": 0.0054772255750516665
+        },
+        "interval_mean_width": {
+          "mean": 48.874591227804586,
+          "std": 1.4473124246988294
+        },
+        "cost_per_engine": {
+          "mean": 14.716,
+          "std": 2.008352558690829
+        },
+        "unplanned_failures": {
+          "mean": 0.8,
+          "std": 0.4472135954999579
+        },
+        "mean_wasted_cycles": {
+          "mean": 11.628947368421054,
+          "std": 0.6748088885092431
+        },
+        "predict_ms_single_row": 8.451073965002251
+      },
+      "runs": [
+        {
+          "seed": 42,
+          "val_rmse": 16.1757789911486,
+          "val_cost_per_engine": 10.845,
+          "test_rmse": 17.754120628014046,
+          "interval_coverage": 0.86,
+          "interval_mean_width": 48.379264150603746,
+          "cost_per_engine": 15.515,
+          "unplanned_failures": 1.0,
+          "mean_wasted_cycles": 10.68421052631579,
+          "maintenance_threshold": 10.0
+        },
+        {
+          "seed": 0,
+          "val_rmse": 16.312511165354998,
+          "val_cost_per_engine": 10.852500000000001,
+          "test_rmse": 17.754120628014046,
+          "interval_coverage": 0.86,
+          "interval_mean_width": 46.69286215693571,
+          "cost_per_engine": 15.65,
+          "unplanned_failures": 1.0,
+          "mean_wasted_cycles": 12.105263157894736,
+          "maintenance_threshold": 10.0
+        },
+        {
+          "seed": 1,
+          "val_rmse": 16.186418352315467,
+          "val_cost_per_engine": 10.9,
+          "test_rmse": 17.754120628014046,
+          "interval_coverage": 0.86,
+          "interval_mean_width": 50.07877923869805,
+          "cost_per_engine": 11.125,
+          "unplanned_failures": 0.0,
+          "mean_wasted_cycles": 11.25,
+          "maintenance_threshold": 11.0
+        },
+        {
+          "seed": 2,
+          "val_rmse": 16.94236597575156,
+          "val_cost_per_engine": 10.83,
+          "test_rmse": 17.754120628014046,
+          "interval_coverage": 0.87,
+          "interval_mean_width": 48.963405297344806,
+          "cost_per_engine": 15.675,
+          "unplanned_failures": 1.0,
+          "mean_wasted_cycles": 12.368421052631579,
+          "maintenance_threshold": 9.0
+        },
+        {
+          "seed": 3,
+          "val_rmse": 16.962729789109904,
+          "val_cost_per_engine": 10.75125,
+          "test_rmse": 17.754120628014046,
+          "interval_coverage": 0.87,
+          "interval_mean_width": 50.25864529544063,
+          "cost_per_engine": 15.615,
+          "unplanned_failures": 1.0,
+          "mean_wasted_cycles": 11.736842105263158,
+          "maintenance_threshold": 8.0
+        }
+      ]
+    }
+  }
+}

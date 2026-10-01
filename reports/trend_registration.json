@@ -1,0 +1,68 @@
+{
+  "cmapss_rul": {
+    "config": "config/training.yaml",
+    "version": "1",
+    "training_metrics": {
+      "val_rmse": 21.06903868737618,
+      "cv_folds": 5.0,
+      "val_interval_coverage": 0.9001139157023802,
+      "val_interval_mean_width": 48.753363392155926,
+      "conformal_correction": 4.3122529145912125,
+      "maintenance_threshold": 12.0,
+      "val_cost_per_engine": 11.82,
+      "val_unplanned_failures": 0,
+      "val_mean_wasted_cycles": 18.2,
+      "max_rmse": 35.0,
+      "gate_passed": true
+    },
+    "gate_scores": {
+      "test_rmse": 21.39798510142996,
+      "interval_coverage": 0.87,
+      "interval_mean_width": 56.637284780354285,
+      "cost_per_engine": 12.205,
+      "unplanned_failures": 0.0,
+      "mean_wasted_cycles": 22.05,
+      "maintenance_threshold": 12.0
+    },
+    "promoted": false,
+    "gate_reasons": [
+      "absolute floor: test_rmse 21.40 <= 30.00 -> PASS",
+      "interval coverage 0.870 >= 0.800 -> PASS",
+      "no Production champion to compare against (first promotion): needs --confirm-bootstrap after a human reviews the scores -> FAIL"
+    ],
+    "note": "registered in this session's temporary MLflow store; re-register with: python -m pdm.training.train --config-name training.yaml"
+  },
+  "cmapss_rul_trend": {
+    "config": "config/training_trend.yaml",
+    "version": "1",
+    "training_metrics": {
+      "val_rmse": 16.1757789911486,
+      "cv_folds": 5.0,
+      "val_interval_coverage": 0.9001139157023802,
+      "val_interval_mean_width": 42.58458847939366,
+      "conformal_correction": 3.434299661460276,
+      "maintenance_threshold": 10.0,
+      "val_cost_per_engine": 10.845,
+      "val_unplanned_failures": 0,
+      "val_mean_wasted_cycles": 8.45,
+      "max_rmse": 35.0,
+      "gate_passed": true
+    },
+    "gate_scores": {
+      "test_rmse": 17.754120628014046,
+      "interval_coverage": 0.86,
+      "interval_mean_width": 48.379264150603746,
+      "cost_per_engine": 15.515,
+      "unplanned_failures": 1.0,
+      "mean_wasted_cycles": 10.68421052631579,
+      "maintenance_threshold": 10.0
+    },
+    "promoted": false,
+    "gate_reasons": [
+      "absolute floor: test_rmse 17.75 <= 30.00 -> PASS",
+      "interval coverage 0.860 >= 0.800 -> PASS",
+      "no Production champion to compare against (first promotion): needs --confirm-bootstrap after a human reviews the scores -> FAIL"
+    ],
+    "note": "registered in this session's temporary MLflow store; re-register with: python -m pdm.training.train --config-name training_trend.yaml"
+  }
+}

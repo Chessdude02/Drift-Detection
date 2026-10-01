@@ -34,19 +34,62 @@ def add_rolling_features(
 
 
 def build_feature_matrix(
-    df: pd.DataFrame, sensor_columns: list[str], windows: list[int], primary_window: int
+    df: pd.DataFrame,
+    sensor_columns: list[str],
+    windows: list[int],
+    primary_window: int,
+    trend: tuple[int, int] | None = None,
 ) -> pd.DataFrame:
     """Produce the exact feature matrix the model trains/predicts on.
 
     `primary_window` selects which rolling window's columns become the canonical
     `sensor_X_roll_mean_<primary_window>` features (must match config/serving.yaml).
+    `trend=(short, long)` adds `sensor_X_trend_<short>_<long>` = short-window mean minus
+    long-window mean per sensor: how fast the sensor is moving (docs/decisions.md D-27,
+    D-30). Off by default; only the `cmapss_rul_trend` model uses it.
     """
-    featured = add_rolling_features(df, sensor_columns, windows)
-    feature_cols = OP_SETTING_COLUMNS + [
-        f"{col}_roll_mean_{primary_window}" for col in sensor_columns
-    ]
-    return featured[["unit_number", "time_in_cycles"] + feature_cols].copy()
+    needed = sorted(set(windows) | set(trend or ()))
+    featured = add_rolling_features(df, sensor_columns, needed)
+    for col in sensor_columns:
+        if trend:
+            short, long = trend
+            featured[_trend_name(col, trend)] = (
+                featured[f"{col}_roll_mean_{short}"] - featured[f"{col}_roll_mean_{long}"]
+            )
+    cols = feature_columns(sensor_columns, primary_window, trend)
+    return featured[["unit_number", "time_in_cycles"] + cols].copy()
 
 
-def feature_columns(sensor_columns: list[str], primary_window: int) -> list[str]:
-    return OP_SETTING_COLUMNS + [f"{col}_roll_mean_{primary_window}" for col in sensor_columns]
+def _trend_name(col: str, trend: tuple[int, int]) -> str:
+    return f"{col}_trend_{trend[0]}_{trend[1]}"
+
+
+def feature_columns(
+    sensor_columns: list[str], primary_window: int, trend: tuple[int, int] | None = None
+) -> list[str]:
+    cols = OP_SETTING_COLUMNS + [f"{col}_roll_mean_{primary_window}" for col in sensor_columns]
+    if trend:
+        cols += [_trend_name(col, trend) for col in sensor_columns]
+    return cols
+
+
+def trend_from_config(features_cfg: dict) -> tuple[int, int] | None:
+    trend = features_cfg.get("trend")
+    return (int(trend["short_window"]), int(trend["long_window"])) if trend else None
+
+
+def features_from_config(df: pd.DataFrame, features_cfg: dict) -> pd.DataFrame:
+    """build_feature_matrix with everything taken from a training config's `features`."""
+    windows = features_cfg["rolling_windows"]
+    return build_feature_matrix(
+        df, features_cfg["sensor_columns"], windows, max(windows), trend_from_config(features_cfg)
+    )
+
+
+def columns_from_config(features_cfg: dict) -> list[str]:
+    """feature_columns for a training config's `features`."""
+    return feature_columns(
+        features_cfg["sensor_columns"],
+        max(features_cfg["rolling_windows"]),
+        trend_from_config(features_cfg),
+    )

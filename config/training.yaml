@@ -5,6 +5,9 @@ dataset:
   raw_dir: data/raw
   processed_dir: data/processed
   rul_cap: 125                  # standard C-MAPSS RUL clipping ceiling
+  # Frozen holdout engines, never trained on; used only to judge models
+  # (pdm.evaluation.champion_challenger). See scripts/build_cmapss_holdout.py.
+  holdout_units_file: data/holdout/cmapss_FD001_holdout_v1.json
 
 features:
   rolling_windows: [5, 10, 20]  # cycles, for rolling mean/std features
@@ -32,11 +35,42 @@ model:
     max_depth: 6
     num_leaves: 31
     random_state: 42
-  val_split: 0.2
+    verbose: -1
+  val_split: 0.2                 # only used when calibration is split
+  # How the interval and maintenance threshold are calibrated:
+  #   cross_validation: every training engine predicted out-of-fold (cv_folds), final
+  #     model trained on all engines. Cut the seed-to-seed spread of holdout cost from
+  #     +/-1.90 to +/-0.20 and test RMSE 22.3 -> 21.4 (docs/decisions.md D-26).
+  #   split: one random val_split of engines (the old way; noisy with 16 engines).
+  calibration: cross_validation
+  cv_folds: 5
+  # Calibrated prediction interval served next to the point RUL (pdm.training.rul_model).
+  intervals:
+    enabled: true
+    coverage: 0.9               # target share of true RULs inside the interval
+
+# Maintenance rule tuned per model at training time (config/decision.yaml); the chosen
+# threshold ships inside the model and drives the maintenance_recommended output.
+decision_config: decision.yaml
+
+# Log this model's drift reference (training features + out-of-fold predicted RUL)
+# next to the model; the drift job loads the Production model's reference from MLflow.
+drift_reference:
+  enabled: true
+
+# New training rows from real outcomes: failures/maintenance (pdm.labels.outcomes)
+# joined with logged predictions (pdm.labels.build). pdm.training.retrain rebuilds them
+# before every retrain. dir: null = Settings.labels_dir (env LABELS_DIR).
+labels:
+  enabled: true
+  dir: null
 
 mlflow:
   experiment_name: cmapss_rul
   registered_model_name: cmapss_rul
 
 evaluation:
-  max_rmse: 35.0                # CI/model-validation gate threshold on holdout
+  # Sanity floor on internal validation RMSE only - it cannot tell a good model from a
+  # mediocre one. Promotion is decided by the champion/challenger gate
+  # (config/champion_challenger.yaml), not by this.
+  max_rmse: 35.0

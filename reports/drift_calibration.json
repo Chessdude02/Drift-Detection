@@ -1,67 +1,73 @@
 {
-  "calibrated_threshold": 0.47,
+  "thresholds": {
+    "drift.stattest_threshold": 0.32,
+    "sensor_check.threshold": 0.46
+  },
   "target_quantile": 0.99,
-  "drift_share_threshold": 0.5,
   "window_rows": 500,
-  "false_alarm_rate_heldout_folds": {
-    "fleet_500_random_rows": {
-      "calibrated": 0.0,
-      "default_0.1": 0.2375
+  "evaluation_folds_only": {
+    "normal_large_fleet": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.0,
+      "sensor_alert_rate": 0.0
     },
-    "small_fleet_5_engines": {
-      "calibrated": 0.045,
-      "default_0.1": 0.915
+    "normal_small_fleet_5_engines": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.008333333333333333,
+      "sensor_alert_rate": 0.03333333333333333
+    },
+    "ageing_young_fleet": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.0,
+      "sensor_alert_rate": 0.0
+    },
+    "ageing_fd001_official_test_set": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.0,
+      "sensor_alert_rate": 0.0
+    },
+    "ageing_old_fleet_rul_le_30": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.0,
+      "sensor_alert_rate": 0.0
+    },
+    "shift_fd002_six_operating_conditions": {
+      "windows": 120,
+      "retrain_trigger_rate": 1.0,
+      "sensor_alert_rate": 1.0
+    },
+    "shift_fd003_new_fault_mode": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.9666666666666667,
+      "sensor_alert_rate": 1.0
+    },
+    "sensor_offset_0.5std_one_sensor": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.0,
+      "sensor_alert_rate": 1.0,
+      "alert_names_right_sensor_first": 1.0
+    },
+    "sensor_offset_1.0std_one_sensor": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.06666666666666667,
+      "sensor_alert_rate": 1.0,
+      "alert_names_right_sensor_first": 1.0
+    },
+    "sensor_offset_2.0std_one_sensor": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.09166666666666666,
+      "sensor_alert_rate": 1.0,
+      "alert_names_right_sensor_first": 1.0
+    },
+    "sensor_stuck_one_sensor": {
+      "windows": 120,
+      "retrain_trigger_rate": 0.05,
+      "sensor_alert_rate": 1.0,
+      "alert_names_right_sensor_first": 1.0
     }
   },
-  "detection_rate_heldout_folds": {
-    "fd003_new_fault_mode_fleet": {
-      "calibrated": 0.995,
-      "default_0.1": 1.0
-    },
-    "fd002_six_operating_conditions_fleet": {
-      "calibrated": 1.0,
-      "default_0.1": 1.0
-    },
-    "fd001_unseen_near_failure_rul_le_30": {
-      "calibrated": 1.0,
-      "default_0.1": 1.0
-    },
-    "offset_0.25std_all_14_columns": {
-      "calibrated": 0.0,
-      "default_0.1": 1.0
-    },
-    "offset_0.25std_3_of_14_columns": {
-      "calibrated": 0.0,
-      "default_0.1": 0.35
-    },
-    "offset_0.5std_all_14_columns": {
-      "calibrated": 0.89,
-      "default_0.1": 1.0
-    },
-    "offset_0.5std_3_of_14_columns": {
-      "calibrated": 0.0,
-      "default_0.1": 0.35
-    },
-    "offset_1.0std_all_14_columns": {
-      "calibrated": 1.0,
-      "default_0.1": 1.0
-    },
-    "offset_1.0std_3_of_14_columns": {
-      "calibrated": 0.0,
-      "default_0.1": 0.35
-    },
-    "offset_2.0std_all_14_columns": {
-      "calibrated": 1.0,
-      "default_0.1": 1.0
-    },
-    "offset_2.0std_3_of_14_columns": {
-      "calibrated": 0.0,
-      "default_0.1": 0.35
-    }
-  },
-  "evidently_crosscheck_fire_rate_fold3": {
-    "fd001_unseen_fleet": 0.0,
-    "fd002_fleet": 1.0,
-    "fd003_fleet": 1.0
+  "evidently_crosscheck_retrain_rate": {
+    "normal_large_fleet": 0.0,
+    "shift_fd003_new_fault_mode": 1.0
   }
 }

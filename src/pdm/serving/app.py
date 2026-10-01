@@ -17,9 +17,16 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from pdm.common.config import configure_mlflow_env, get_settings, load_yaml
 from pdm.common.logging import setup_logging
-from pdm.serving.inference import predict_row, validate_features
+from pdm.serving.inference import (
+    non_finite_features,
+    out_of_range_features,
+    predict_details,
+    validate_features,
+)
 from pdm.serving.inference_log import InferenceLog
 from pdm.serving.metrics import (
+    INPUT_OUT_OF_RANGE,
+    INPUT_REJECTED,
     MODEL_INFO,
     PREDICTION_VALUE,
     REQUEST_COUNT,
@@ -40,6 +47,9 @@ async def lifespan(app: FastAPI):
     serving_cfg = load_yaml("serving.yaml")
 
     app.state.required_columns = serving_cfg["feature_schema"]["required_columns"]
+    app.state.require_asset_id = serving_cfg.get("input_validation", {}).get(
+        "require_asset_id", True
+    )
     app.state.inference_log = InferenceLog(settings.inference_log_db)
     app.state.loader = ModelLoader(
         model_name=serving_cfg["model"]["name"],
@@ -85,14 +95,28 @@ def predict(req: PredictRequest, request: Request, response: Response) -> Predic
         raise HTTPException(status_code=503, detail="Model not loaded yet")
 
     required = request.app.state.required_columns
+
+    def reject(reason: str, detail: str):
+        REQUEST_COUNT.labels(status="error", shadow=shadow_label).inc()
+        INPUT_REJECTED.labels(reason=reason).inc()
+        raise HTTPException(status_code=422, detail=detail)
+
     missing = validate_features(req.features, required)
     if missing:
-        REQUEST_COUNT.labels(status="error", shadow=shadow_label).inc()
-        raise HTTPException(status_code=422, detail=f"Missing required features: {missing}")
+        reject("missing_features", f"Missing required features: {missing}")
+    if request.app.state.require_asset_id and not req.asset_id:
+        reject("missing_asset_id", "asset_id is required (see serving.yaml input_validation)")
+    bad = non_finite_features(req.features, required)
+    if bad:
+        reject("non_finite", f"Features must be finite numbers: {bad}")
+    warnings = out_of_range_features(req.features, loaded.feature_ranges)
+    for feature in warnings:
+        INPUT_OUT_OF_RANGE.labels(feature=feature).inc()
 
     start = time.perf_counter()
     try:
-        prediction = predict_row(loaded.model, req.features, required)
+        details = predict_details(loaded.model, req.features, required)
+        prediction = details["rul"]
     except Exception:
         REQUEST_COUNT.labels(status="error", shadow=shadow_label).inc()
         logger.exception("Prediction failed")
@@ -103,7 +127,16 @@ def predict(req: PredictRequest, request: Request, response: Response) -> Predic
     REQUEST_COUNT.labels(status="ok", shadow=shadow_label).inc()
     PREDICTION_VALUE.observe(prediction)
     feature_stats.update({c: req.features[c] for c in required})
-    request.app.state.inference_log.record(req.features, prediction, shadow=shadow)
+    request.app.state.inference_log.record(
+        req.features,
+        prediction,
+        shadow=shadow,
+        asset_id=req.asset_id,
+        cycle=req.cycle,
+        observed_at=req.observed_at.timestamp() if req.observed_at else None,
+        input_warnings=warnings,
+        model_version=loaded.version,
+    )
     MODEL_INFO.labels(model_name=loaded.name, version=loaded.version).set(1)
 
     if shadow:
@@ -114,7 +147,13 @@ def predict(req: PredictRequest, request: Request, response: Response) -> Predic
         response.headers["X-Shadow"] = "true"
 
     return PredictResponse(
-        predicted_rul=prediction, model_name=loaded.name, model_version=loaded.version
+        predicted_rul=prediction,
+        model_name=loaded.name,
+        model_version=loaded.version,
+        rul_lower=details["rul_lower"],
+        rul_upper=details["rul_upper"],
+        maintenance_recommended=details["maintenance_recommended"],
+        input_warnings=[f"{f} outside training range" for f in warnings],
     )
 
 

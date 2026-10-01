@@ -41,3 +41,7 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# Outcome store and built label datasets (pdm.labels) - local/runtime data
+data/outcomes/
+data/labels/

@@ -1,0 +1,74 @@
+{
+  "subset": "FD003",
+  "live_engines": 60,
+  "eval_engines": 40,
+  "before": {
+    "version": "1",
+    "rmse_all_cycles": 22.458201226045812,
+    "rmse_last_60_cycles": 29.020789307688396,
+    "cost_per_engine": 45.1875,
+    "unplanned_failures": 15,
+    "missed": 7,
+    "late": 8,
+    "mean_wasted_cycles": 23.0,
+    "n_engines": 40
+  },
+  "replay": {
+    "requests": 13167,
+    "rejected": 0,
+    "fates": {
+      "failure": 38,
+      "maintenance": 15,
+      "running": 7
+    }
+  },
+  "drift_check": {
+    "action": "retrain",
+    "engines_in_window": 7,
+    "drift_share": 0.8571428571428571,
+    "faulty_sensors": [],
+    "sensor_verdict": "system_wide_shift"
+  },
+  "outcome_import": {
+    "added": 53,
+    "duplicate": 0,
+    "bad": 0
+  },
+  "labels": {
+    "rows_seen": 12365,
+    "dropped_shadow": 0,
+    "dropped_no_asset_or_cycle": 0,
+    "dropped_no_outcome_yet": 0,
+    "dropped_censored_below_cap": 1781,
+    "dropped_missing_features": 0,
+    "dropped_duplicate": 0,
+    "rows_labelled": 10584,
+    "rows_failure": 9899,
+    "rows_censored_at_cap": 685,
+    "engine_lives": 48,
+    "assets": 48
+  },
+  "gate": {
+    "approved": true,
+    "promoted": true,
+    "reasons": [
+      "absolute floor: test_rmse 22.30 <= 30.00 -> PASS",
+      "interval coverage 0.840 >= 0.800 -> PASS",
+      "cost_per_engine: challenger 12.235 vs champion 12.675 (limit 13.309) -> PASS",
+      "unplanned_failures: challenger 0.000 vs champion 0.000 (limit 0.000) -> PASS",
+      "test_rmse: challenger 22.301 vs champion 22.664 (limit 23.664) -> PASS"
+    ],
+    "candidate_version": "2"
+  },
+  "after": {
+    "version": "2",
+    "rmse_all_cycles": 19.79501893767566,
+    "rmse_last_60_cycles": 21.401182247619108,
+    "cost_per_engine": 11.8425,
+    "unplanned_failures": 0,
+    "missed": 0,
+    "late": 0,
+    "mean_wasted_cycles": 18.425,
+    "n_engines": 40
+  }
+}

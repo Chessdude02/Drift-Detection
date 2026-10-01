@@ -6,6 +6,9 @@ dataset type by registering another adapter here — the rest of the training pi
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
@@ -13,24 +16,52 @@ from sklearn.model_selection import GroupShuffleSplit
 from pdm.data.bearing_features import build_bearing_feature_matrix
 from pdm.data.bearing_features import feature_columns as bearing_columns
 from pdm.data.cmapss import load_train as load_cmapss_train
-from pdm.data.features import build_feature_matrix as build_cmapss_matrix
-from pdm.data.features import cap_rul
-from pdm.data.features import feature_columns as cmapss_columns
+from pdm.data.features import cap_rul, columns_from_config, features_from_config
 
 
-def _cmapss_load(raw_dir, dataset_cfg: dict, features_cfg: dict) -> tuple[pd.DataFrame, list[str]]:
+def load_holdout_units(dataset_cfg: dict) -> list[int]:
+    """Engines reserved by `dataset.holdout_units_file` (scripts/build_cmapss_holdout.py);
+    empty if the config sets none."""
+    path = dataset_cfg.get("holdout_units_file")
+    if not path:
+        return []
+    return [int(u) for u in json.loads(Path(path).read_text())["units"]]
+
+
+def _cmapss_features(raw_dir, dataset_cfg: dict, features_cfg: dict):
     df = load_cmapss_train(raw_dir, subset=dataset_cfg["subset"])
+    df = df.sort_values(["unit_number", "time_in_cycles"]).reset_index(drop=True)
+    true_rul = df["rul"].to_numpy()
     rul_cap = dataset_cfg.get("rul_cap")
     if rul_cap is not None:
         df["rul"] = cap_rul(df["rul"], cap=rul_cap)
 
-    sensors = features_cfg["sensor_columns"]
-    windows = features_cfg["rolling_windows"]
-    primary_window = max(windows)
-
-    feature_df = build_cmapss_matrix(df, sensors, windows, primary_window)
+    feature_df = features_from_config(df, features_cfg)
     feature_df["rul"] = df["rul"].values
-    return feature_df, cmapss_columns(sensors, primary_window)
+    # Uncapped cycles-to-failure, for scoring maintenance decisions
+    # (pdm.evaluation.decision); never a model input.
+    feature_df["true_rul"] = true_rul
+    return feature_df, columns_from_config(features_cfg)
+
+
+def _cmapss_load(raw_dir, dataset_cfg: dict, features_cfg: dict) -> tuple[pd.DataFrame, list[str]]:
+    """Training rows: every engine except the frozen holdout."""
+    feature_df, cols = _cmapss_features(raw_dir, dataset_cfg, features_cfg)
+    holdout = load_holdout_units(dataset_cfg)
+    if holdout:
+        feature_df = feature_df[~feature_df["unit_number"].isin(holdout)].reset_index(drop=True)
+    return feature_df, cols
+
+
+def load_cmapss_holdout(
+    raw_dir, dataset_cfg: dict, features_cfg: dict
+) -> tuple[pd.DataFrame, list[str]]:
+    """Rows of the frozen holdout engines only (run to failure, never trained on)."""
+    holdout = load_holdout_units(dataset_cfg)
+    if not holdout:
+        raise ValueError("dataset.holdout_units_file is not set; there is no frozen holdout")
+    feature_df, cols = _cmapss_features(raw_dir, dataset_cfg, features_cfg)
+    return feature_df[feature_df["unit_number"].isin(holdout)].reset_index(drop=True), cols
 
 
 def _cmapss_split(

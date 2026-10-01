@@ -17,13 +17,27 @@ spec:
           containers:
             - name: train
               image: ghcr.io/OWNER/pdm-train:latest
-              args: ["--raw-dir", "/data/raw", "--config-name", "training.yaml", "--fail-on-gate"]
+              # Train a candidate, then the champion/challenger gate decides whether it
+              # replaces Production (config/champion_challenger.yaml). A rejected
+              # candidate stays registered but is never promoted.
+              command: ["python", "-m", "pdm.training.retrain"]
+              args: ["--raw-dir", "/data/raw", "--config-name", "training.yaml"]
               env:
                 - name: MLFLOW_TRACKING_URI
                   value: "http://pdm-mlflow.pdm.svc.cluster.local:5000"
+                # Outcome labels (pdm.labels): logged predictions + recorded outcomes.
+                - name: INFERENCE_LOG_DB
+                  value: "/inference-log/inference_log.db"
+                - name: OUTCOME_DB
+                  value: "/data/outcomes/outcomes.db"
+                - name: LABELS_DIR
+                  value: "/data/labels"
               volumeMounts:
                 - name: data
                   mountPath: /data
+                - name: inference-log
+                  mountPath: /inference-log
+                  readOnly: true
               resources:
                 requests: { cpu: "500m", memory: "512Mi" }
                 limits: { cpu: "2", memory: "2Gi" }
@@ -31,3 +45,7 @@ spec:
             - name: data
               persistentVolumeClaim:
                 claimName: pdm-mlflow-data
+            - name: inference-log
+              persistentVolumeClaim:
+                claimName: pdm-inference-log
+                readOnly: true

@@ -25,6 +25,12 @@ feature_schema:
     - sensor_20_roll_mean_20
     - sensor_21_roll_mean_20
 
+input_validation:
+  # Reject requests without an engine id. Without it the drift check cannot count
+  # engines per window (it needs ~5+) and outcomes cannot be matched back to
+  # predictions to make new training labels. Set false only for legacy clients.
+  require_asset_id: true
+
 logging:
   inference_log_db: inference_log.db
   sample_rate: 1.0               # fraction of requests to persist for drift analysis

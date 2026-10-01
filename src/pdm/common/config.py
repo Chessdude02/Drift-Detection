@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     serving_port: int = 8000
     model_refresh_seconds: int = 300
     inference_log_db: str = "./inference_log.db"
+    # Failures / maintenance per engine (pdm.labels.outcomes) and where built label
+    # datasets are written (pdm.labels.build).
+    outcome_db: str = "./data/outcomes/outcomes.db"
+    labels_dir: str = "./data/labels"
 
     drift_threshold: float = 0.5
     drift_reference_path: str = "./data/processed/reference.parquet"

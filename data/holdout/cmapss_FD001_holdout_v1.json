@@ -1,0 +1,30 @@
+{
+  "subset": "FD001",
+  "version": "v1",
+  "units": [
+    8,
+    14,
+    16,
+    17,
+    18,
+    19,
+    20,
+    27,
+    28,
+    36,
+    56,
+    71,
+    80,
+    81,
+    82,
+    89,
+    90,
+    91,
+    94,
+    99
+  ],
+  "seed": 2024,
+  "n_units_in_subset": 100,
+  "created_at": "2026-09-30T18:37:14.913823+00:00",
+  "note": "Never train on these engines. Used by pdm.evaluation.champion_challenger."
+}

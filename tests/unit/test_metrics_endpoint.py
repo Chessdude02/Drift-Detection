@@ -27,7 +27,7 @@ def client(tmp_path, monkeypatch):
 
 def test_metrics_endpoint_exposes_expected_names(client):
     required = client.app.state.required_columns
-    client.post("/predict", json={"features": {c: 1.0 for c in required}})
+    client.post("/predict", json={"asset_id": "engine-1", "features": {c: 1.0 for c in required}})
 
     resp = client.get("/metrics")
     assert resp.status_code == 200

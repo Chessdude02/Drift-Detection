@@ -4,6 +4,9 @@ pydantic>=2.7,<3.0
 pydantic-settings>=2.3,<3.0
 prometheus-client>=0.20,<1.0
 mlflow>=2.14,<3.0
+# mlflow 2.x imports sqlalchemy.pool.FallbackAsyncAdaptedQueuePool, which SQLAlchemy 2.1
+# removed; without this pin a fresh install fails on `import mlflow` with a sqlite store.
+sqlalchemy>=2.0,<2.1
 pandas>=2.2,<3.0
 numpy>=1.26,<2.0
 kubernetes>=29.0,<31.0
