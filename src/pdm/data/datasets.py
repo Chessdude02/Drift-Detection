@@ -16,9 +16,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from pdm.data.bearing_features import build_bearing_feature_matrix
 from pdm.data.bearing_features import feature_columns as bearing_columns
 from pdm.data.cmapss import load_train as load_cmapss_train
-from pdm.data.features import build_feature_matrix as build_cmapss_matrix
-from pdm.data.features import cap_rul
-from pdm.data.features import feature_columns as cmapss_columns
+from pdm.data.features import cap_rul, columns_from_config, features_from_config
 
 
 def load_holdout_units(dataset_cfg: dict) -> list[int]:
@@ -38,16 +36,12 @@ def _cmapss_features(raw_dir, dataset_cfg: dict, features_cfg: dict):
     if rul_cap is not None:
         df["rul"] = cap_rul(df["rul"], cap=rul_cap)
 
-    sensors = features_cfg["sensor_columns"]
-    windows = features_cfg["rolling_windows"]
-    primary_window = max(windows)
-
-    feature_df = build_cmapss_matrix(df, sensors, windows, primary_window)
+    feature_df = features_from_config(df, features_cfg)
     feature_df["rul"] = df["rul"].values
     # Uncapped cycles-to-failure, for scoring maintenance decisions
     # (pdm.evaluation.decision); never a model input.
     feature_df["true_rul"] = true_rul
-    return feature_df, cmapss_columns(sensors, primary_window)
+    return feature_df, columns_from_config(features_cfg)
 
 
 def _cmapss_load(raw_dir, dataset_cfg: dict, features_cfg: dict) -> tuple[pd.DataFrame, list[str]]:

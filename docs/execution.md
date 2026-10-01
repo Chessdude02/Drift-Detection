@@ -43,7 +43,7 @@ rollback).
 
 | Command | What it does |
 |---|---|
-| `python -m pdm.training.train [--raw-dir] [--config-name] [--no-register] [--fail-on-gate] [--tag K=V] [--json-out]` | Trains and logs one model (no gate). |
+| `python -m pdm.training.train [--raw-dir] [--config-name] [--no-register] [--fail-on-gate] [--tag K=V] [--json-out]` | Trains and logs one model (no gate). `--config-name training_trend.yaml` trains the separate trend model `cmapss_rul_trend` (D-31). |
 | `python -m pdm.evaluation.champion_challenger --candidate-version N [--promote] [--confirm-bootstrap] [--json-out]` | Scores candidate vs Production on the frozen data; promotes if approved and `--promote`. |
 | `python -m pdm.labels.outcomes import --csv FILE` / `add --asset-id A --event failure\|maintenance --cycle N` / `list` | Records what happened to engines. |
 | `python -m pdm.labels.build [--out DIR]` | Builds the label dataset from outcomes + inference log (preview; retrain does this itself). |
@@ -60,6 +60,7 @@ rollback).
 | `seed_reference_data.py` | Writes a drift reference to `data/processed/reference.parquet` (only for `reference.source: file`). |
 | `generate_call_graph.py` | Regenerates `docs/call_graph/` (section 5). |
 | `experiments/compare_drift_methods.py` | The experiment behind D-4/D-5. ~25 min. |
+| `experiments/trend_all_engines.py [--datasets FD001 FD003]` | Baseline vs trend model, every engine held out once (5 folds × 2 repeats) → `reports/trend_all_engines.json` (D-30). ~25 min alone; don't run other training at the same time (D-25). |
 | `experiments/model_quality.py [--variants ...] [--out ...]` | Model variants × 5 seeds, scored like the gate → `reports/model_quality*.json` (D-26–D-28). ~15–25 min. |
 | `promote_to_production.py`, `score_on_holdout.py`, `build_holdout.py`, `promote_model.py`, `rollback_production.py`, `mlflow_gcs_sync.py`, `rollback.ps1`, `setup_kind.ps1` | The IMS-bearing promotion flow, rollback, MLflow sync and cluster setup that predate this work; see `RUNBOOK.md`. `rollback_production.py` also works for `cmapss_rul`. |
 
@@ -180,7 +181,8 @@ This is the main entry point: it exercises labels, training and the gate.
         the manifest.
    2. `run_training(raw_dir, config, register=True)`:
       - `get_adapter("cmapss")["load"]` = `_cmapss_load` → `_cmapss_features` (reads
-        `train_FD001.txt` via `load_train`, sorts, caps RUL, `build_feature_matrix`,
+        `train_FD001.txt` via `load_train`, sorts, caps RUL, `features_from_config` →
+        `build_feature_matrix` (plus trend features if the config sets `features.trend`),
         keeps uncapped `true_rul`) then drops the holdout engines
         (`load_holdout_units`). Returns `(feature_df, feature_columns)`.
       - `add_outcome_labels(feature_df, cols, config)` → appends `labels.parquet` rows
@@ -247,7 +249,7 @@ pdm.training.retrain.main()
      │       ├─ build_labels()
      │       └─ write_label_dataset()
      ├─ run_training()
-     │   ├─ _cmapss_load() ── _cmapss_features() ── load_train(), build_feature_matrix()
+     │   ├─ _cmapss_load() ── _cmapss_features() ── load_train(), features_from_config() ── build_feature_matrix()
      │   ├─ add_outcome_labels() ── load_label_dataset()
      │   ├─ base_data_manifest()
      │   └─ _run_bundle_training()
@@ -305,6 +307,7 @@ pdm.serving.app.lifespan()           (startup)
 | `decide` | same | The gate rules | challenger, champion, cfg → `GateDecision` | none | `run_gate` |
 | `simulate_policy` | `src/pdm/evaluation/decision.py` | Replays engines under "maintain when signal ≤ H" | trajectories, signal, H, lead time, costs → counts + cost | none | `choose_threshold`, `score_model` |
 | `promote_version_with_metrics` / `rollback_to_previous` | `src/pdm/evaluation/registry.py` | Stage transitions + rollback marker | client, name, version → none / ModelVersion | MLflow registry | `run_gate` / `rollback_production.py` |
+| `features_from_config` / `columns_from_config` | `src/pdm/data/features.py` | Feature matrix / column list from a config's `features` (incl. optional trend) | df, features cfg → DataFrame / list | none | `_cmapss_features`, `load_evaluation_data`, `refresh_labels`, `labels.build.main` |
 | `build_labels` | `src/pdm/labels/build.py` | Outcome events + log rows → labelled rows | rows, events, cols, cap → (DataFrame, stats) | none | `build_and_write` |
 | `OutcomeStore.import_csv` | `src/pdm/labels/outcomes.py` | Imports a CMMS export, skips duplicates/bad rows | path → counts | writes `outcome_events` | CLI, demo |
 | `run_check` | `src/pdm/drift/run_drift_check.py` | One drift check on read rows | reference, rows, config → dict(action, n_engines, evaluation) | none | `main`, demo, tests |
@@ -377,6 +380,7 @@ pdm.serving.app.lifespan()           (startup)
 | | `dataset.holdout_units_file` | data/holdout/cmapss_FD001_holdout_v1.json | Engines never trained on (D-11) |
 | | `features.rolling_windows` | [5, 10, 20] | Largest one (20) is the feature window |
 | | `features.sensor_columns` | 14 sensors | Model inputs |
+| | `features.trend.short_window` / `long_window` | unset (training.yaml); 5 / 20 (training_trend.yaml) | Adds `sensor_X_trend_<short>_<long>` features (D-30) |
 | | `model.algorithm` / `params` | lightgbm, 300 trees, lr 0.05, depth 6 | Point model |
 | | `model.calibration` / `cv_folds` | cross_validation / 5 | How interval and threshold are calibrated (D-26); `split` = one 80/20 split |
 | | `model.val_split` | 0.2 | Share of engines for validation (split calibration only) |
@@ -406,6 +410,7 @@ pdm.serving.app.lifespan()           (startup)
 | `serving.yaml` (+ Helm copy, must be identical) | `model.name` / `stage` / `refresh_seconds` | cmapss_rul / Production / 300 | What serving loads |
 | | `feature_schema.required_columns` | 17 cols | Required request features (test-enforced to match training) |
 | | `input_validation.require_asset_id` | true | Reject requests without `asset_id` (D-15) |
+| `training_trend.yaml` | everything in training.yaml, plus `features.trend` | registered as `cmapss_rul_trend`, labels off | The experimental trend model (D-31); not servable without 14 extra request features |
 | `evaluation.yaml`, `promotion_gate.yaml`, `training_bearing.yaml` | — | — | IMS-bearing pipeline (predates this work) |
 
 ### Environment variables (`Settings` in `src/pdm/common/config.py`; name = field in upper case)
@@ -439,7 +444,11 @@ Listed with each command in section 1. Defaults: `--raw-dir data/raw`,
   in `src/pdm/data/datasets.py`, register them in `_ADAPTERS`, and add a config file.
   The frame needs `unit_number`, `time_in_cycles`, `rul`, and `true_rul` (for decision
   scoring). Build a frozen holdout for it.
-- **New feature:** change `features` in `training.yaml`, then update
+- **New feature:** add it in `build_feature_matrix` / `feature_columns`
+  (`src/pdm/data/features.py`) behind a `features` config key, the way `trend` is, so
+  every caller of `features_from_config` gets it. Try it first in a separate config
+  registered under its own model name (like `training_trend.yaml`, D-31). To make it
+  the served model, change `features` in `training.yaml`, then update
   `serving.yaml` + the Helm copy + `drift.yaml` columns (the consistency test will fail
   until you do), recalibrate drift (`scripts/calibrate_drift.py`), and note that old
   inference-log rows cannot become labels for the new feature set.

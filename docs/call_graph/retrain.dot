@@ -26,19 +26,23 @@ digraph G {
         subgraph "cluster_pdm__data__datasets" {
 
             graph [style="filled,rounded", fillcolor="#80808018", label="pdm.data.datasets"];
-            "pdm__data__datasets___ADAPTERS" [label="_ADAPTERS", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets._ADAPTERS\nsrc/pdm/data/datasets.py:124\nname in pdm.data.datasets"];
-            "pdm__data__datasets___cmapss_features" [label="_cmapss_features", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets._cmapss_features\nsrc/pdm/data/datasets.py:33\nfunction in pdm.data.datasets"];
-            "pdm__data__datasets__get_adapter" [label="get_adapter", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets.get_adapter\nsrc/pdm/data/datasets.py:130\nfunction in pdm.data.datasets"];
-            "pdm__data__datasets__load_cmapss_holdout" [label="load_cmapss_holdout", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets.load_cmapss_holdout\nsrc/pdm/data/datasets.py:62\nfunction in pdm.data.datasets"];
-            "pdm__data__datasets__load_holdout_units" [label="load_holdout_units", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets.load_holdout_units\nsrc/pdm/data/datasets.py:24\nfunction in pdm.data.datasets"];
+            "pdm__data__datasets___ADAPTERS" [label="_ADAPTERS", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets._ADAPTERS\nsrc/pdm/data/datasets.py:118\nname in pdm.data.datasets"];
+            "pdm__data__datasets___cmapss_features" [label="_cmapss_features", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets._cmapss_features\nsrc/pdm/data/datasets.py:31\nfunction in pdm.data.datasets"];
+            "pdm__data__datasets__get_adapter" [label="get_adapter", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets.get_adapter\nsrc/pdm/data/datasets.py:124\nfunction in pdm.data.datasets"];
+            "pdm__data__datasets__load_cmapss_holdout" [label="load_cmapss_holdout", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets.load_cmapss_holdout\nsrc/pdm/data/datasets.py:56\nfunction in pdm.data.datasets"];
+            "pdm__data__datasets__load_holdout_units" [label="load_holdout_units", style="filled", fillcolor="#ffd265b2", fontcolor="#000000", group="2", tooltip="pdm.data.datasets.load_holdout_units\nsrc/pdm/data/datasets.py:22\nfunction in pdm.data.datasets"];
         }
         subgraph "cluster_pdm__data__features" {
 
             graph [style="filled,rounded", fillcolor="#80808018", label="pdm.data.features"];
+            "pdm__data__features___trend_name" [label="_trend_name", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features._trend_name\nsrc/pdm/data/features.py:63\nfunction in pdm.data.features"];
             "pdm__data__features__add_rolling_features" [label="add_rolling_features", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features.add_rolling_features\nsrc/pdm/data/features.py:15\nfunction in pdm.data.features"];
             "pdm__data__features__build_feature_matrix" [label="build_feature_matrix", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features.build_feature_matrix\nsrc/pdm/data/features.py:36\nfunction in pdm.data.features"];
             "pdm__data__features__cap_rul" [label="cap_rul", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features.cap_rul\nsrc/pdm/data/features.py:10\nfunction in pdm.data.features"];
-            "pdm__data__features__feature_columns" [label="feature_columns", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features.feature_columns\nsrc/pdm/data/features.py:51\nfunction in pdm.data.features"];
+            "pdm__data__features__columns_from_config" [label="columns_from_config", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features.columns_from_config\nsrc/pdm/data/features.py:89\nfunction in pdm.data.features"];
+            "pdm__data__features__feature_columns" [label="feature_columns", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features.feature_columns\nsrc/pdm/data/features.py:67\nfunction in pdm.data.features"];
+            "pdm__data__features__features_from_config" [label="features_from_config", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features.features_from_config\nsrc/pdm/data/features.py:81\nfunction in pdm.data.features"];
+            "pdm__data__features__trend_from_config" [label="trend_from_config", style="filled", fillcolor="#f6ff65b2", fontcolor="#000000", group="3", tooltip="pdm.data.features.trend_from_config\nsrc/pdm/data/features.py:76\nfunction in pdm.data.features"];
         }
         subgraph "cluster_pdm__drift__life_stage" {
 
@@ -55,11 +59,11 @@ digraph G {
 
             graph [style="filled,rounded", fillcolor="#80808018", label="pdm.evaluation.champion_challenger"];
             "pdm__evaluation__champion_challenger__GateDecision" [label="GateDecision", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger.GateDecision\nsrc/pdm/evaluation/champion_challenger.py:40\nclass in pdm.evaluation.champion_challenger"];
-            "pdm__evaluation__champion_challenger___threshold_of" [label="_threshold_of", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger._threshold_of\nsrc/pdm/evaluation/champion_challenger.py:134\nfunction in pdm.evaluation.champion_challenger"];
-            "pdm__evaluation__champion_challenger__decide" [label="decide", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger.decide\nsrc/pdm/evaluation/champion_challenger.py:86\nfunction in pdm.evaluation.champion_challenger"];
+            "pdm__evaluation__champion_challenger___threshold_of" [label="_threshold_of", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger._threshold_of\nsrc/pdm/evaluation/champion_challenger.py:133\nfunction in pdm.evaluation.champion_challenger"];
+            "pdm__evaluation__champion_challenger__decide" [label="decide", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger.decide\nsrc/pdm/evaluation/champion_challenger.py:85\nfunction in pdm.evaluation.champion_challenger"];
             "pdm__evaluation__champion_challenger__load_evaluation_data" [label="load_evaluation_data", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger.load_evaluation_data\nsrc/pdm/evaluation/champion_challenger.py:45\nfunction in pdm.evaluation.champion_challenger"];
-            "pdm__evaluation__champion_challenger__run_gate" [label="run_gate", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger.run_gate\nsrc/pdm/evaluation/champion_challenger.py:138\nfunction in pdm.evaluation.champion_challenger"];
-            "pdm__evaluation__champion_challenger__score_model" [label="score_model", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger.score_model\nsrc/pdm/evaluation/champion_challenger.py:58\nfunction in pdm.evaluation.champion_challenger"];
+            "pdm__evaluation__champion_challenger__run_gate" [label="run_gate", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger.run_gate\nsrc/pdm/evaluation/champion_challenger.py:137\nfunction in pdm.evaluation.champion_challenger"];
+            "pdm__evaluation__champion_challenger__score_model" [label="score_model", style="filled", fillcolor="#65ff78b2", fontcolor="#000000", group="6", tooltip="pdm.evaluation.champion_challenger.score_model\nsrc/pdm/evaluation/champion_challenger.py:57\nfunction in pdm.evaluation.champion_challenger"];
         }
         subgraph "cluster_pdm__evaluation__decision" {
 
@@ -189,21 +193,26 @@ digraph G {
         "pdm__data__cmapss__load_test" -> "pdm__data__cmapss___read_whitespace_file" [style="solid",  color="#000000"];
         "pdm__data__cmapss__load_train" -> "pdm__data__cmapss___read_whitespace_file" [style="solid",  color="#000000"];
         "pdm__data__datasets___cmapss_features" -> "pdm__data__cmapss__load_train" [style="solid",  color="#000000"];
-        "pdm__data__datasets___cmapss_features" -> "pdm__data__features__build_feature_matrix" [style="solid",  color="#000000"];
         "pdm__data__datasets___cmapss_features" -> "pdm__data__features__cap_rul" [style="solid",  color="#000000"];
-        "pdm__data__datasets___cmapss_features" -> "pdm__data__features__feature_columns" [style="solid",  color="#000000"];
+        "pdm__data__datasets___cmapss_features" -> "pdm__data__features__columns_from_config" [style="solid",  color="#000000"];
+        "pdm__data__datasets___cmapss_features" -> "pdm__data__features__features_from_config" [style="solid",  color="#000000"];
         "pdm__data__datasets__get_adapter" -> "pdm__data__datasets___ADAPTERS" [style="solid",  color="#000000"];
         "pdm__data__datasets__load_cmapss_holdout" -> "pdm__data__datasets___cmapss_features" [style="solid",  color="#000000"];
         "pdm__data__datasets__load_cmapss_holdout" -> "pdm__data__datasets__load_holdout_units" [style="solid",  color="#000000"];
-        "pdm__data__features__build_feature_matrix" -> "pdm__data__cmapss__OP_SETTING_COLUMNS" [style="solid",  color="#000000"];
         "pdm__data__features__build_feature_matrix" -> "pdm__data__features__add_rolling_features" [style="solid",  color="#000000"];
+        "pdm__data__features__build_feature_matrix" -> "pdm__data__features__feature_columns" [style="solid",  color="#000000"];
+        "pdm__data__features__columns_from_config" -> "pdm__data__features__feature_columns" [style="solid",  color="#000000"];
+        "pdm__data__features__columns_from_config" -> "pdm__data__features__trend_from_config" [style="solid",  color="#000000"];
         "pdm__data__features__feature_columns" -> "pdm__data__cmapss__OP_SETTING_COLUMNS" [style="solid",  color="#000000"];
+        "pdm__data__features__feature_columns" -> "pdm__data__features___trend_name" [style="solid",  color="#000000"];
+        "pdm__data__features__features_from_config" -> "pdm__data__features__build_feature_matrix" [style="solid",  color="#000000"];
+        "pdm__data__features__features_from_config" -> "pdm__data__features__trend_from_config" [style="solid",  color="#000000"];
         "pdm__drift__life_stage__add_oof_predictions" -> "pdm__training__train___fit_model" [style="solid",  color="#000000"];
         "pdm__evaluation__champion_challenger__decide" -> "pdm__evaluation__champion_challenger__GateDecision" [style="solid",  color="#000000"];
         "pdm__evaluation__champion_challenger__load_evaluation_data" -> "pdm__data__cmapss__load_test" [style="solid",  color="#000000"];
         "pdm__evaluation__champion_challenger__load_evaluation_data" -> "pdm__data__datasets__load_cmapss_holdout" [style="solid",  color="#000000"];
-        "pdm__evaluation__champion_challenger__load_evaluation_data" -> "pdm__data__features__build_feature_matrix" [style="solid",  color="#000000"];
         "pdm__evaluation__champion_challenger__load_evaluation_data" -> "pdm__data__features__cap_rul" [style="solid",  color="#000000"];
+        "pdm__evaluation__champion_challenger__load_evaluation_data" -> "pdm__data__features__features_from_config" [style="solid",  color="#000000"];
         "pdm__evaluation__champion_challenger__run_gate" -> "pdm__common__config__load_yaml" [style="solid",  color="#000000"];
         "pdm__evaluation__champion_challenger__run_gate" -> "pdm__evaluation__champion_challenger___threshold_of" [style="solid",  color="#000000"];
         "pdm__evaluation__champion_challenger__run_gate" -> "pdm__evaluation__champion_challenger__decide" [style="solid",  color="#000000"];
@@ -250,7 +259,7 @@ digraph G {
         "pdm__serving__inference_log__InferenceLog__read_since" -> "pdm__serving__inference_log__InferenceLog___rows" [style="solid",  color="#000000"];
         "pdm__serving__inference_log__InferenceLog__record" -> "pdm__serving__inference_log__InferenceLog___connect" [style="solid",  color="#000000"];
         "pdm__training__retrain__refresh_labels" -> "pdm__common__config__get_settings" [style="solid",  color="#000000"];
-        "pdm__training__retrain__refresh_labels" -> "pdm__data__features__feature_columns" [style="solid",  color="#000000"];
+        "pdm__training__retrain__refresh_labels" -> "pdm__data__features__columns_from_config" [style="solid",  color="#000000"];
         "pdm__training__retrain__refresh_labels" -> "pdm__labels__build__build_and_write" [style="solid",  color="#000000"];
         "pdm__training__retrain__retrain" -> "pdm__evaluation__champion_challenger__run_gate" [style="solid",  color="#000000"];
         "pdm__training__retrain__retrain" -> "pdm__training__retrain__refresh_labels" [style="solid",  color="#000000"];

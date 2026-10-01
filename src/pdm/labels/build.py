@@ -183,7 +183,7 @@ def load_label_dataset(label_dir: Path, feature_cols: list[str]) -> tuple[pd.Dat
 def main() -> int:
     from pdm.common.config import get_settings, load_yaml
     from pdm.common.logging import setup_logging
-    from pdm.data.features import feature_columns
+    from pdm.data.features import columns_from_config
 
     setup_logging()
     settings = get_settings()
@@ -196,7 +196,7 @@ def main() -> int:
 
     cfg = load_yaml(args.config_name)
     features = cfg["features"]
-    cols = feature_columns(features["sensor_columns"], max(features["rolling_windows"]))
+    cols = columns_from_config(features)
     manifest = build_and_write(
         args.inference_log_db, args.outcome_db, Path(args.out), cols, cfg["dataset"]["rul_cap"]
     )

@@ -47,9 +47,11 @@ code states a reason, it's in the relevant module's docstring.
 | D-24 | Static call graph with pyan3 + Graphviz | Accepted | 2026-09-30 |
 | D-25 | One OpenMP thread per serving process | Accepted | 2026-09-30 |
 | D-26 | Cross-validated calibration of interval and threshold | Accepted | 2026-09-30 |
-| D-27 | Trend features (5- minus 20-cycle mean) | Proposed | 2026-09-30 |
+| D-27 | Trend features (5- minus 20-cycle mean) | Superseded by D-30 | 2026-09-30 |
 | D-28 | Hyperparameter tuning and seed averaging | Rejected | 2026-09-30 |
 | D-29 | Fix the pre-existing Linux-only test failure in this PR | Accepted | 2026-09-30 |
+| D-30 | Trend features judged on all 100 engines: better decisions | Accepted (as a separate model, D-31) | 2026-10-01 |
+| D-31 | Register the trend model as its own MLflow model, `cmapss_rul_trend` | Accepted | 2026-10-01 |
 
 ---
 
@@ -836,7 +838,8 @@ code states a reason, it's in the relevant module's docstring.
 
 ## D-27: Trend features (5- minus 20-cycle mean)
 - **Date:** 2026-09-30
-- **Status:** Proposed (not adopted)
+- **Status:** Superseded by D-30. The "worse on holdout" result below was luck on 20
+  engines; all 100 engines show the opposite.
 - **Context:** The model is mediocre (RMSE about 21–22 against published 12–18, D-1).
   One cheap extra signal is how fast each sensor is changing.
 - **Options considered:**
@@ -934,3 +937,100 @@ code states a reason, it's in the relevant module's docstring.
     CI for the first time.
 - **Evidence:** PR #2 comment 5921043519; `tests/unit/test_config.py`.
 - **Related:** D-2, D-10.
+
+## D-30: Trend features judged on all 100 engines: better decisions
+- **Date:** 2026-10-01
+- **Status:** Accepted (as a separate model, D-31; not yet the served model)
+- **Context:** D-27 left this open. Trend features cut RMSE a lot, but on the 20 frozen
+  holdout engines they averaged about one extra unplanned failure. 20 engines can't
+  separate luck from a real effect.
+- **Options considered:**
+  1. Trust the 20-engine holdout and reject trend.
+     *Pro:* already measured. *Con:* the sample is too small to decide anything.
+  2. Grow the frozen holdout.
+     *Pro:* simple. *Con:* takes still more engines out of training, and it's still one
+     sample.
+  3. Score every engine. Split all 100 into 5 groups of 20; hold out each group while
+     both models train on the other 80 (exactly as training does); run the
+     maintenance rule on the held-out engines one by one. Repeat with 2 splits, on
+     FD001 and FD003. Compare the two models engine by engine.
+     *Pro:* 100 engines per dataset, a paired comparison, a confidence interval.
+     *Con:* about 30 minutes of compute.
+- **Decision:** Option 3 (`scripts/experiments/trend_all_engines.py`). The verdict:
+  trend features make **better** maintenance decisions.
+- **Factors that led to it:** The results below.
+- **Trade-offs accepted:** Two repeats only, and the decision costs are still
+  placeholders (D-13). The cost difference depends on how much wasted life is worth.
+- **Expected effect:** Settle whether trend features cost failures.
+- **Actual effect** (`reports/trend_all_engines.json`; each engine scored by models that
+  never saw it):
+
+  | | FD001 baseline | FD001 trend | FD003 baseline | FD003 trend |
+  |---|---|---|---|---|
+  | Cost per engine | 12.37 | **11.06** | 13.13 | **11.97** |
+  | Unplanned failures (of 200) | 0 | 0 | 2 | 2 |
+  | Life wasted per maintained engine (cycles) | 23.7 | **10.7** | 22.5 | **10.8** |
+  | RMSE, all cycles | 21.65 | **16.35** | 19.57 | **14.37** |
+  | RMSE, last 60 cycles | 22.10 | **14.65** | 21.04 | **12.76** |
+  | Interval coverage (target 90%) | 92.6% | 91.7% | 92.2% | 91.0% |
+
+  Paired by engine, trend minus baseline:
+  - **FD001:** cost −1.30 per engine (95% interval −1.58 to −1.04); cheaper on 93 of
+    100 engines; failures identical.
+  - **FD003:** cost −1.16 (95% interval −3.69 to +1.52, so not conclusive on its
+    own); cheaper on 81, worse on 17; failures equal (1 engine better, 1 worse).
+
+  Trend halves wasted engine life with no extra failures. D-27's "0.8 failures on the
+  holdout" didn't survive the larger test.
+- **Evidence:** `reports/trend_all_engines.json`,
+  `scripts/experiments/trend_all_engines.py`, `run_log.md` section 17.
+- **Related:** D-13, D-26, D-27, D-31.
+
+## D-31: Register the trend model as its own MLflow model, `cmapss_rul_trend`
+- **Date:** 2026-10-01
+- **Status:** Accepted
+- **Context:** The user asked for the trend model to be logged "under a different
+  model". D-30 shows it makes better decisions, but serving it means every client
+  sending 14 more features.
+- **Options considered:**
+  1. Replace `cmapss_rul` with the trend model.
+     *Pro:* the benefit lands now. *Con:* breaks every client, and the gate would have
+     to approve it (see below).
+  2. A new version of `cmapss_rul` with trend features.
+     *Pro:* one name. *Con:* one model name holding two different input sets, so
+     serving and the drift checks would break the moment it was promoted.
+  3. A separate registered model and config (`config/training_trend.yaml` →
+     `cmapss_rul_trend`, experiment `cmapss_rul_trend`).
+     *Pro:* can't touch what serving loads; easy to compare side by side; easy to
+     delete. *Con:* a second config to keep in sync.
+- **Decision:** Option 3.
+  - Trend features are a config option (`features.trend`) handled in one place
+    (`features_from_config` / `columns_from_config` in `src/pdm/data/features.py`), so
+    training, the gate and label-building use identical features.
+  - Outcome labels are off for this model: logged readings come from `cmapss_rul`
+    requests and lack the trend features.
+- **Factors that led to it:** The user's request; zero risk to the served model.
+- **Trade-offs accepted:**
+  - Two configs.
+  - The trend model can't learn from outcome labels until its features are logged.
+  - **This session's MLflow store is temporary.** The registration below lives in this
+    container. To register it in the real store, run
+    `python -m pdm.training.train --config-name training_trend.yaml` against it.
+- **Expected effect:** A comparable, registered trend model; `cmapss_rul` unchanged.
+- **Actual effect** (fresh store, both trained the same way, neither promoted):
+
+  | Registered model | NASA test RMSE | Coverage / width | Frozen 20-engine holdout |
+  |---|---|---|---|
+  | `cmapss_rul` v1 | 21.40 | 87% / 56.6 | cost 12.21, 0 failures, 22.1 wasted |
+  | `cmapss_rul_trend` v1 | **17.75** | 86% / 48.4 | cost 15.52, **1 failure**, 10.7 wasted |
+
+  Each run logged its model, drift reference and data manifest.
+
+  **Open problem this exposes:** on the 20 frozen engines the trend model misses one
+  engine, so today's gate (D-14) would **reject** it against `cmapss_rul`, even though
+  across all 100 engines it has the same failures and lower cost (D-30). The gate's
+  judging set is too small for decisions this close. Fix: score gate candidates with
+  the all-engine cross-validation from D-30, not the 20-engine holdout. Not done yet.
+- **Evidence:** `config/training_trend.yaml`, `reports/trend_registration.json`,
+  `run_log.md` section 17.
+- **Related:** D-14, D-19, D-30.

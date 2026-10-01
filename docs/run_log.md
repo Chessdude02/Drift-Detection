@@ -306,3 +306,27 @@ pytest -q -m unit          # 129 passed
 pytest -q -m integration   # 16 passed
 pytest -q -m "not unit and not integration" --collect-only   # 0 tests (every test now runs in CI)
 ```
+
+## 17. Trend model on all engines, and registered separately
+
+```bash
+python scripts/experiments/trend_all_engines.py --raw-dir data/raw   # -> reports/trend_all_engines.json
+python -m pdm.training.train --config-name training.yaml             # registers cmapss_rul
+python -m pdm.training.train --config-name training_trend.yaml       # registers cmapss_rul_trend
+python -m pdm.evaluation.champion_challenger --candidate-version 1 --config-name training.yaml
+python -m pdm.evaluation.champion_challenger --candidate-version 1 --config-name training_trend.yaml
+```
+
+All-engine evaluation: 100 engines × 2 repeats per dataset, every engine held out by
+models that never saw it. Full table in `decisions.md` D-30.
+- FD001: cost 12.37 → 11.06 (paired −1.30, 95% interval −1.58 to −1.04; 93/100 engines
+  cheaper); failures 0 → 0.
+- FD003: cost 13.13 → 11.97 (paired −1.16, 95% interval −3.69 to +1.52); failures 2 → 2.
+
+Registration (fresh store; neither promoted, since a first promotion needs a human):
+`cmapss_rul` v1 scored test RMSE 21.40, holdout cost 12.21, 0 failures.
+`cmapss_rul_trend` v1 scored test RMSE 17.75, holdout cost 15.52, 1 failure.
+
+Timing: one fold took **2,439 s** while a second training process competed for the 4
+CPUs, and **49 s** once it was alone. That's the same thread thrashing as D-25: never
+run two model-training jobs side by side on a small machine.

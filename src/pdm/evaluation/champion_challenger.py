@@ -28,7 +28,7 @@ from pdm.common.config import configure_mlflow_env, load_yaml
 from pdm.common.logging import setup_logging
 from pdm.data.cmapss import load_test
 from pdm.data.datasets import load_cmapss_holdout
-from pdm.data.features import build_feature_matrix, cap_rul
+from pdm.data.features import cap_rul, features_from_config
 from pdm.evaluation.decision import simulate_policy
 from pdm.evaluation.registry import get_production_version, promote_version_with_metrics
 from pdm.training.evaluate import rmse
@@ -46,8 +46,7 @@ def load_evaluation_data(raw_dir: Path, training_cfg: dict) -> dict:
     dataset_cfg, features_cfg = training_cfg["dataset"], training_cfg["features"]
     holdout, cols = load_cmapss_holdout(raw_dir, dataset_cfg, features_cfg)
     test_df, true_rul = load_test(raw_dir, dataset_cfg["subset"])
-    windows = features_cfg["rolling_windows"]
-    feats = build_feature_matrix(test_df, features_cfg["sensor_columns"], windows, max(windows))
+    feats = features_from_config(test_df, features_cfg)
     last = feats.groupby("unit_number").tail(1).set_index("unit_number").sort_index()
     y_test = true_rul.loc[last.index]
     if dataset_cfg.get("rul_cap") is not None:

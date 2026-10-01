@@ -22,7 +22,7 @@ from pathlib import Path
 
 from pdm.common.config import configure_mlflow_env, get_settings, load_yaml
 from pdm.common.logging import setup_logging
-from pdm.data.features import feature_columns
+from pdm.data.features import columns_from_config
 from pdm.evaluation.champion_challenger import run_gate
 from pdm.labels.build import build_and_write
 from pdm.training.train import run_training
@@ -38,7 +38,7 @@ def refresh_labels(config: dict) -> dict | None:
         return None
     settings = get_settings()
     features = config["features"]
-    cols = feature_columns(features["sensor_columns"], max(features["rolling_windows"]))
+    cols = columns_from_config(features)
     return build_and_write(
         settings.inference_log_db,
         settings.outcome_db,

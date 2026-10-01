@@ -36,9 +36,9 @@ _choose_maintenance_threshold
     [U] load_yaml
     [U] threshold_grid
 _cmapss_features
-    [U] build_feature_matrix
     [U] cap_rul
-    [U] feature_columns
+    [U] columns_from_config
+    [U] features_from_config
     [U] load_train
 _cmapss_load
     [U] _cmapss_features
@@ -100,8 +100,8 @@ build_bearing_feature_matrix
     [U] list_snapshot_files
     [U] load_snapshot
 build_feature_matrix
-    [U] OP_SETTING_COLUMNS
     [U] add_rolling_features
+    [U] feature_columns
 build_holdout_dataframe
     [U] build_bearing_feature_matrix
     [U] feature_columns
@@ -109,6 +109,9 @@ build_labels
     [U] LABEL_UNIT_OFFSET
 choose_threshold
     [U] simulate_policy
+columns_from_config
+    [U] feature_columns
+    [U] trend_from_config
 configure_mlflow_env
     [U] get_settings
 decide
@@ -131,6 +134,10 @@ events
 feature_columns
     [U] CHANNEL_STATS
     [U] OP_SETTING_COLUMNS
+    [U] _trend_name
+features_from_config
+    [U] build_feature_matrix
+    [U] trend_from_config
 fit
     [U] _fit_point
     [U] _make_regressor
@@ -166,8 +173,8 @@ load_cmapss_holdout
     [U] _cmapss_features
     [U] load_holdout_units
 load_evaluation_data
-    [U] build_feature_matrix
     [U] cap_rul
+    [U] features_from_config
     [U] load_cmapss_holdout
     [U] load_test
 load_label_dataset
@@ -196,11 +203,11 @@ main
     [U] __init__
     [U] add
     [U] build_and_write
+    [U] columns_from_config
     [U] configure_mlflow_env
     [U] configure_mlflow_env
     [U] configure_mlflow_env
     [U] events
-    [U] feature_columns
     [U] get_settings
     [U] get_settings
     [U] get_settings
@@ -281,7 +288,7 @@ record
     [U] _connect
 refresh_labels
     [U] build_and_write
-    [U] feature_columns
+    [U] columns_from_config
     [U] get_settings
 reject
     [U] INPUT_REJECTED

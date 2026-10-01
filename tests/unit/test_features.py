@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from pdm.data.cmapss import SENSOR_COLUMNS, load_test, load_train
@@ -55,3 +56,27 @@ def test_build_feature_matrix_matches_feature_columns(raw_data_dir):
     expected = feature_columns(sensors, primary_window=10)
     assert set(expected).issubset(matrix.columns)
     assert matrix.shape[0] == df.shape[0]
+
+
+def test_trend_features_are_short_minus_long_mean(raw_data_dir):
+    from pdm.data.features import columns_from_config, features_from_config
+
+    df = load_train(raw_data_dir, subset="FD001")
+    cfg = {
+        "sensor_columns": SENSOR_COLUMNS[:2],
+        "rolling_windows": [5, 10],
+        "trend": {"short_window": 2, "long_window": 5},
+    }
+    out = features_from_config(df, cfg)
+    cols = columns_from_config(cfg)
+    assert list(out.columns) == ["unit_number", "time_in_cycles", *cols]
+    trend_col = f"{SENSOR_COLUMNS[0]}_trend_2_5"
+    assert trend_col in cols
+    rolled = add_rolling_features(df, SENSOR_COLUMNS[:1], [2, 5])
+    expected = (
+        rolled[f"{SENSOR_COLUMNS[0]}_roll_mean_2"] - rolled[f"{SENSOR_COLUMNS[0]}_roll_mean_5"]
+    )
+    np.testing.assert_allclose(out[trend_col].to_numpy(), expected.to_numpy())
+
+    without = features_from_config(df, {k: v for k, v in cfg.items() if k != "trend"})
+    assert not any("trend" in c for c in without.columns)

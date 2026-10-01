@@ -10,9 +10,9 @@ _choose_maintenance_threshold
     [U] load_yaml
     [U] threshold_grid
 _cmapss_features
-    [U] build_feature_matrix
     [U] cap_rul
-    [U] feature_columns
+    [U] columns_from_config
+    [U] features_from_config
     [U] load_train
 _fit_bundle_cv
     [U] _choose_maintenance_threshold
@@ -63,12 +63,15 @@ build_and_write
     [U] events
     [U] write_label_dataset
 build_feature_matrix
-    [U] OP_SETTING_COLUMNS
     [U] add_rolling_features
+    [U] feature_columns
 build_labels
     [U] LABEL_UNIT_OFFSET
 choose_threshold
     [U] simulate_policy
+columns_from_config
+    [U] feature_columns
+    [U] trend_from_config
 decide
     [U] GateDecision
 decision_signal
@@ -77,6 +80,10 @@ events
     [U] _connect
 feature_columns
     [U] OP_SETTING_COLUMNS
+    [U] _trend_name
+features_from_config
+    [U] build_feature_matrix
+    [U] trend_from_config
 fit
     [U] _fit_point
     [U] _make_regressor
@@ -98,8 +105,8 @@ load_cmapss_holdout
     [U] _cmapss_features
     [U] load_holdout_units
 load_evaluation_data
-    [U] build_feature_matrix
     [U] cap_rul
+    [U] features_from_config
     [U] load_cmapss_holdout
     [U] load_test
 load_label_dataset
@@ -134,7 +141,7 @@ record
     [U] _connect
 refresh_labels
     [U] build_and_write
-    [U] feature_columns
+    [U] columns_from_config
     [U] get_settings
 retrain
     [U] refresh_labels
